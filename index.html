@@ -340,6 +340,7 @@ select.inp option{background:var(--bg3)}
     <div class="ni" onclick="nav('affiliate')"><div class="ni-ico">◌</div>Affiliate</div>
     <div class="sb-sec">SYSTEM</div>
     <div class="ni" onclick="nav('guardian')"><div class="ni-ico">◍</div>Guardian</div>
+    <div class="ni" onclick="nav('atlascore')"><div class="ni-ico">⬡</div>Atlas Core</div>
     <div class="ni" onclick="nav('database')"><div class="ni-ico">▦</div>Database</div>
     <div class="ni" onclick="nav('roadmap')"><div class="ni-ico">▷</div>Roadmap</div>
     <div class="sb-footer">
@@ -585,6 +586,47 @@ select.inp option{background:var(--bg3)}
         </div>
       </div>
 
+      <!-- ATLAS CORE -->
+      <div class="view" id="view-atlascore">
+        <div class="g3" style="margin-bottom:14px">
+          <div class="metric" style="grid-column:span 1">
+            <div class="m-label">OVERALL STATUS</div>
+            <div class="m-value" id="ac-status" style="text-transform:uppercase">—</div>
+            <div class="m-sub" id="ac-asof">—</div>
+          </div>
+          <div class="metric">
+            <div class="m-label">DEPARTMENTS ONLINE</div>
+            <div class="m-value gold" id="ac-depts">—</div>
+            <div class="m-sub" id="ac-depts-sub">of 10 total</div>
+          </div>
+          <div class="metric">
+            <div class="m-label">HEALTH SCORE</div>
+            <div class="m-value" id="ac-health">—</div>
+            <div class="m-sub" id="ac-alerts-sub">0 active alerts</div>
+          </div>
+        </div>
+
+        <div class="g2">
+          <div>
+            <div class="panel"><div class="cr tl"></div><div class="cr tr"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                <div class="pt" style="margin:0">ENTITY REGISTRY</div>
+                <button class="btn" onclick="loadAtlasCoreData()">⟳ REFRESH</button>
+              </div>
+              <div id="ac-registry-depts" style="margin-bottom:16px"></div>
+              <div id="ac-registry-agents" style="margin-bottom:16px"></div>
+              <div id="ac-registry-services"></div>
+            </div>
+          </div>
+          <div>
+            <div class="panel"><div class="cr tl"></div><div class="cr tr"></div><div class="cr bl"></div><div class="cr br"></div>
+              <div class="pt">ATLAS TIMELINE</div>
+              <div id="ac-event-log" style="max-height:520px;overflow-y:auto"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ROADMAP -->
       <div class="view" id="view-roadmap">
         <div class="panel" style="margin-bottom:14px">
@@ -718,7 +760,7 @@ async function loadAllData(){
     if(td&&td.length>0){const seen=new Set();S.trends=td.filter(t=>seen.has(t.category)?false:seen.add(t.category)).map(fromDB.trend);}
     else{S.trends=[{cat:'FASHION',score:91,tag:'🔥 HOT'},{cat:'STREETWEAR',score:78,tag:'📈 RISING'},{cat:'FRAGRANCE',score:64,tag:'👀 WATCH'},{cat:'LUXURY',score:55,tag:'💡 OPP'},{cat:'AI/TECH',score:48,tag:'📊 STABLE'},{cat:'ENTREPRENEUR',score:39,tag:'📊 STABLE'}];}
     if(S.businesses.length===0){await sb.rpc('seed_atlas_defaults',{p_user_id:S.user.id});const{data:b2}=await sb.from('businesses').select('*').order('created_at');S.businesses=(b2||[]).map(fromDB.business);const{data:t2}=await sb.from('tasks').select('*').order('created_at');S.tasks=(t2||[]).map(fromDB.task);}
-    showLoading(false);updateBadges();renderDashboard();loadGuardianData();
+    showLoading(false);updateBadges();renderDashboard();loadGuardianData();loadAtlasCoreData();
     notify('✅ Atlas synchronized');
   }catch(e){showLoading(false);notify('⚠️ Sync error: '+e.message,'err');}
 }
@@ -745,8 +787,8 @@ async function checkSession(){const{data:{session}}=await sb.auth.getSession();i
 async function getToken(){const{data:{session}}=await sb.auth.getSession();return session?.access_token||null;}
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const TITLES={dashboard:'Dashboard',ai:'AI Command',businesses:'Businesses',finance:'Finance',affiliate:'Affiliate Engine',trends:'Trend Intelligence',content:'Content Engine',agents:'AI Workforce',database:'Database',knowledge:'Knowledge Vault',tasks:'Task Manager',roadmap:'Phase Roadmap',guardian:'Guardian Department'};
-const SUBS={dashboard:'AABOS OVERVIEW',ai:'ASK ATLAS ANYTHING',businesses:'REVENUE PORTFOLIO',finance:'TRACK EVERY RAND',affiliate:'LINKS & COMMISSIONS',trends:'MARKET INTELLIGENCE',content:'CREATE & SCHEDULE',agents:'SIX AI AGENTS',database:'CENTRAL MEMORY',knowledge:'SECOND BRAIN',tasks:'PRIORITY OPS',roadmap:'0 TO AUTONOMOUS',guardian:'SYSTEM PROTECTION'};
+const TITLES={dashboard:'Dashboard',ai:'AI Command',businesses:'Businesses',finance:'Finance',affiliate:'Affiliate Engine',trends:'Trend Intelligence',content:'Content Engine',agents:'AI Workforce',database:'Database',knowledge:'Knowledge Vault',tasks:'Task Manager',roadmap:'Phase Roadmap',guardian:'Guardian Department',atlascore:'Atlas Core'};
+const SUBS={dashboard:'AABOS OVERVIEW',ai:'ASK ATLAS ANYTHING',businesses:'REVENUE PORTFOLIO',finance:'TRACK EVERY RAND',affiliate:'LINKS & COMMISSIONS',trends:'MARKET INTELLIGENCE',content:'CREATE & SCHEDULE',agents:'SIX AI AGENTS',database:'CENTRAL MEMORY',knowledge:'SECOND BRAIN',tasks:'PRIORITY OPS',roadmap:'0 TO AUTONOMOUS',guardian:'SYSTEM PROTECTION',atlascore:'REGISTRY · EVENTS · STATE'};
 function nav(p){
   document.querySelectorAll('.view').forEach(v=>{v.classList.remove('active');v.style.display='none';});
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
@@ -755,7 +797,7 @@ function nav(p){
   document.querySelectorAll('.ni').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+p+"'"))n.classList.add('active');});
   document.getElementById('ptitle').textContent=TITLES[p]||p;
   document.getElementById('psub').textContent=SUBS[p]||'';
-  const fns={dashboard:renderDashboard,tasks:renderTasks,businesses:renderBiz,agents:renderAgents,trends:renderTrends,content:renderContent,database:renderDB,knowledge:renderKnowledge,finance:renderFinance,affiliate:renderAffiliate,roadmap:renderRoadmap,guardian:renderGuardian};
+  const fns={dashboard:renderDashboard,tasks:renderTasks,businesses:renderBiz,agents:renderAgents,trends:renderTrends,content:renderContent,database:renderDB,knowledge:renderKnowledge,finance:renderFinance,affiliate:renderAffiliate,roadmap:renderRoadmap,guardian:renderGuardian,atlascore:renderAtlasCore};
   if(fns[p])fns[p]();
 }
 
@@ -878,7 +920,7 @@ function renderAgents(){
     <button class="arb" onclick="runAgent('${a.name}')">▶ RUN AGENT</button></div>`).join('');
 }
 const AGENT_PROMPTS={'Trend Agent':'You are Atlas Trend Agent. Analyze Pinterest and social media trends for fashion, streetwear, fragrance, luxury accessories. Give top 5 trending topics with specific content angles for my South African business portfolio.','Content Agent':'You are Atlas Content Agent. Generate a full content schedule: 3 Pinterest pins, 2 Instagram posts, 1 X post, 1 blog title. Cover ThriftVerse, Atlas Noir luxury belts, fragrance brand. Give exact copy ready to post.','Analytics Agent':'You are Atlas Analytics Agent. Give a concise business performance report: what channels are working, what to cut, and 3 high-impact actions this week to grow revenue.','Research Agent':'You are Atlas Research Agent. Research the luxury streetwear accessories market in South Africa. Give: top 3 competitors, market size estimate, 3 unmet needs, 2 Atlas Noir positioning angles.','Sales Agent':'You are Atlas Sales Agent. Create a 3-step outreach sequence for potential Atlas Noir luxury belt stockists. Include subject lines, full copy, and follow-up timing.','Brain Agent':'You are Atlas Brain Agent. Businesses: ThriftVerse, Atlas Noir, Fragrance Brand, Affiliate Engine. Give top 5 strategic insights that should guide this month.'};
-function runAgent(name){notify('◉ '+name+' running...');nav('ai');setTimeout(()=>callAI(AGENT_PROMPTS[name]||'Run '+name+' and report findings.'),200);}
+function runAgent(name){notify('◉ '+name+' running...');nav('ai');setTimeout(()=>callAI(AGENT_PROMPTS[name]||'Run '+name+' and report findings.',name),200);}
 
 // ── TRENDS ────────────────────────────────────────────────────
 function renderTrends(){
@@ -1049,12 +1091,74 @@ function renderGuardian(){
     </div>`).join(''):'<div style="color:var(--green);font-size:10px;padding:8px;font-family:var(--fm);display:flex;align-items:center;gap:7px"><div class="sdot g"></div>NO ACTIVE ALERTS</div>';
 }
 
+// ── ATLAS CORE ────────────────────────────────────────────────
+const AC={state:null,registry:[],events:[]};
+
+async function loadAtlasCoreData(){
+  try{
+    const[stateRes,regRes,evRes]=await Promise.all([
+      sb.from('v_atlas_system_state').select('*').single(),
+      sb.from('atlas_registry').select('*').order('entity_type').order('name'),
+      sb.from('atlas_events').select('*').order('created_at',{ascending:false}).limit(25)
+    ]);
+    AC.state=stateRes.data||null;
+    AC.registry=regRes.data||[];
+    AC.events=evRes.data||[];
+    if(document.getElementById('view-atlascore').classList.contains('active'))renderAtlasCore();
+  }catch(e){console.log('Atlas Core data:',e.message);}
+}
+
+const STATUS_COLOR={online:'var(--green)',healthy:'var(--green)',idle:'var(--text3)',degraded:'var(--red)',critical:'var(--red)',planned:'var(--text3)',warning:'var(--gold)',unknown:'var(--text3)'};
+const STATUS_DOT={online:'g',healthy:'g',idle:'',degraded:'r',critical:'r',planned:'',warning:'a',unknown:''};
+
+function renderAtlasCore(){
+  if(!AC.state){document.getElementById('ac-status').textContent='—';return;}
+  const s=AC.state;
+  document.getElementById('ac-status').textContent=s.overall_status;
+  document.getElementById('ac-status').style.color=STATUS_COLOR[s.overall_status]||'var(--text)';
+  document.getElementById('ac-asof').textContent='As of '+new Date(s.as_of).toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('ac-depts').textContent=s.departments_online;
+  document.getElementById('ac-depts-sub').textContent='of '+s.departments_total+' total';
+  document.getElementById('ac-health').textContent=s.health_score!==null?s.health_score:'—';
+  document.getElementById('ac-health').style.color=s.health_score>=90?'var(--green)':s.health_score>=70?'var(--gold)':'var(--red)';
+  document.getElementById('ac-alerts-sub').textContent=s.active_alerts+' active alert'+(s.active_alerts===1?'':'s')+(s.critical_alerts>0?' · '+s.critical_alerts+' critical':'');
+
+  const grouped={department:[],agent:[],service:[]};
+  AC.registry.forEach(e=>{if(grouped[e.entity_type])grouped[e.entity_type].push(e);});
+
+  const renderGroup=(title,items)=>items.length?`
+    <div style="font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.14em;margin-bottom:8px">${title} (${items.length})</div>
+    ${items.map(e=>`
+      <div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--border2)">
+        <div class="sdot ${STATUS_DOT[e.status]||''}" style="flex-shrink:0"></div>
+        <div style="flex:1"><div style="font-size:12px;font-weight:600">${esc(e.name)}</div>${e.department?`<div style="font-family:var(--fm);font-size:7px;color:var(--text3)">${esc(e.department)}</div>`:''}</div>
+        <span class="tag" style="color:${STATUS_COLOR[e.status]||'var(--text3)'};border-color:${STATUS_COLOR[e.status]||'var(--border2)'}33">${e.status.toUpperCase()}</span>
+      </div>`).join('')}` : '';
+
+  document.getElementById('ac-registry-depts').innerHTML=renderGroup('DEPARTMENTS',grouped.department);
+  document.getElementById('ac-registry-agents').innerHTML=renderGroup('AGENTS',grouped.agent);
+  document.getElementById('ac-registry-services').innerHTML=renderGroup('SERVICES',grouped.service);
+
+  document.getElementById('ac-event-log').innerHTML=AC.events.length?AC.events.map(ev=>{
+    const t=new Date(ev.created_at);
+    const timeAgo=Math.round((Date.now()-t.getTime())/60000);
+    const timeLabel=timeAgo<1?'now':timeAgo<60?timeAgo+'m ago':Math.round(timeAgo/60)+'h ago';
+    return`<div style="padding:8px 0;border-bottom:1px solid var(--border2)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+        <span style="font-family:var(--fm);font-size:10px;color:var(--gold)">${esc(ev.event_type)}</span>
+        <span style="font-family:var(--fm);font-size:8px;color:var(--text3);margin-left:auto">${timeLabel}</span>
+      </div>
+      ${ev.entity_key?`<div style="font-family:var(--fm);font-size:8px;color:var(--text3)">${esc(ev.entity_key)}</div>`:''}
+    </div>`;
+  }).join(''):'<div style="color:var(--text3);font-size:10px;padding:8px;font-family:var(--fm)">NO EVENTS YET — RUN A GUARDIAN SCAN OR AI AGENT</div>';
+}
+
 async function runGuardianScan(){
   notify('◉ Running health scan...');
   try{const token=await getToken();if(!token)throw new Error('Not authenticated');
     const resp=await fetch(GUARDIAN_HEALTH_URL,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:'{}'});
     const data=await resp.json();
-    if(data.success){GD.score=data.guardian_score;GD.status=data.status;updateGuardianSidebar();await loadGuardianData();notify('✅ Health scan complete — Score: '+data.guardian_score+'/100');}
+    if(data.success){GD.score=data.guardian_score;GD.status=data.status;updateGuardianSidebar();await loadGuardianData();loadAtlasCoreData();notify('✅ Health scan complete — Score: '+data.guardian_score+'/100');}
     else throw new Error(data.error||'Scan failed');
   }catch(e){notify('❌ '+e.message,'err');}
 }
@@ -1064,7 +1168,7 @@ async function runGuardianBackup(){
   try{const token=await getToken();if(!token)throw new Error('Not authenticated');
     const resp=await fetch(GUARDIAN_BACKUP_URL,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:'{}'});
     const data=await resp.json();
-    if(data.success){await loadGuardianData();notify('✅ Backup complete — '+data.tables_backed+' tables, '+data.total_rows+' rows');}
+    if(data.success){await loadGuardianData();loadAtlasCoreData();notify('✅ Backup complete — '+data.tables_backed+' tables, '+data.total_rows+' rows');}
     else throw new Error(data.error||'Backup failed');
   }catch(e){notify('❌ '+e.message,'err');}
 }
@@ -1074,7 +1178,7 @@ document.addEventListener('keydown',e=>{const inp=document.getElementById('ci');
 async function sendCmd(){const inp=document.getElementById('ci');const text=inp.value.trim();if(!text)return;inp.value='';await callAI(text);}
 function qc(text){nav('ai');setTimeout(()=>callAI(text),120);}
 
-async function callAI(userMsg){
+async function callAI(userMsg,agentName){
   const cm=document.getElementById('cm');if(!cm)return;
   cm.innerHTML+=`<div class="msg"><div class="mr">OPERATOR</div><div class="mc2">${esc(userMsg)}</div></div>`;
   const tid='tp-'+Date.now();
@@ -1084,12 +1188,15 @@ async function callAI(userMsg){
   if(S.chatHistory.length>20)S.chatHistory=S.chatHistory.slice(-20);
   try{
     const token=await getToken();if(!token)throw new Error('Session expired. Please refresh.');
-    const resp=await fetch(GATEWAY_URL,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({messages:S.chatHistory})});
+    const payload={messages:S.chatHistory};
+    if(agentName)payload.agent=agentName;
+    const resp=await fetch(GATEWAY_URL,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!resp.ok){const err=await resp.json().catch(()=>({}));throw new Error(err.error||'Gateway error '+resp.status);}
     const data=await resp.json();const reply=data.reply||'';
     S.chatHistory.push({role:'assistant',content:reply});
     const el=document.getElementById(tid);
     if(el)el.outerHTML=`<div class="msg"><div class="mr ai">ATLAS</div><div class="mc2">${fmtAI(reply)}</div></div>`;
+    if(agentName)loadAtlasCoreData();
   }catch(e){const el=document.getElementById(tid);if(el)el.outerHTML=`<div class="msg"><div class="mr ai">ATLAS</div><div class="mc2" style="color:var(--red);font-family:var(--fm);font-size:10px">${esc(e.message)}</div></div>`;}
   cm.scrollTop=cm.scrollHeight;
 }

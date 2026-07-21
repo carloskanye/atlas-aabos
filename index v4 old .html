@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATLAS AABOS</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#080808;--bg2:#0d0d0d;--bg3:#111;--bg4:#161616;
+--gold:#c9a84c;--gold2:rgba(201,168,76,.12);--gold3:rgba(201,168,76,.06);
+--text:#e8e4d9;--text2:rgba(232,228,217,.55);--text3:rgba(232,228,217,.25);
+--border:rgba(201,168,76,.12);--border2:rgba(232,228,217,.07);
+--red:#e05252;--green:#4caf6e;--blue:#5a8fff;
+--fm:"Space Mono",monospace;--fs:"Syne",sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--fs);overflow:hidden}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--gold3)}
+
+/* LOGIN */
+#login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000}
+.l-glow{position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 50%,rgba(201,168,76,.04),transparent 70%);pointer-events:none}
+.l-box{width:360px;position:relative;z-index:1}
+.l-logo{display:flex;align-items:center;gap:14px;margin-bottom:40px}
+.l-mark{width:44px;height:44px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-weight:700;font-size:13px;color:#000;position:relative;flex-shrink:0}
+.l-mark::before{content:"";position:absolute;inset:-6px;border:1px solid rgba(201,168,76,.25)}
+.l-mark::after{content:"";position:absolute;inset:-12px;border:1px solid rgba(201,168,76,.1)}
+.l-title{font-size:22px;font-weight:800;letter-spacing:.08em}
+.l-sub{font-family:var(--fm);font-size:9px;color:var(--text3);letter-spacing:.18em;margin-top:2px}
+.l-panel{background:var(--bg2);border:1px solid var(--border);padding:32px;position:relative}
+.l-panel::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.4}
+.lc{position:absolute;width:8px;height:8px;border-color:rgba(201,168,76,.35);border-style:solid}
+.lc.tl{top:-1px;left:-1px;border-width:1px 0 0 1px}
+.lc.tr{top:-1px;right:-1px;border-width:1px 1px 0 0}
+.lc.bl{bottom:-1px;left:-1px;border-width:0 0 1px 1px}
+.lc.br{bottom:-1px;right:-1px;border-width:0 1px 1px 0}
+.l-ptitle{font-family:var(--fm);font-size:9px;color:var(--text3);letter-spacing:.18em;margin-bottom:24px}
+.lf-label{font-family:var(--fm);font-size:9px;color:var(--text3);letter-spacing:.12em;display:block;margin-bottom:6px}
+.lf-input{width:100%;background:var(--bg3);border:1px solid var(--border2);padding:11px 14px;font-family:var(--fs);font-size:13px;color:var(--text);outline:none;margin-bottom:14px;transition:border-color .2s}
+.lf-input:focus{border-color:rgba(201,168,76,.35)}
+.l-btn{width:100%;background:var(--gold);color:#000;border:none;padding:13px;font-family:var(--fm);font-size:11px;font-weight:700;letter-spacing:.1em;cursor:pointer;transition:opacity .2s;margin-top:4px}
+.l-btn:hover{opacity:.85}
+.l-btn:disabled{opacity:.5}
+#login-error{font-family:var(--fm);font-size:10px;color:var(--red);margin-top:12px;display:none;letter-spacing:.05em}
+
+/* LOADING */
+#loading-bar{position:fixed;top:0;left:0;right:0;height:1px;background:var(--gold);z-index:9999;display:none;transform-origin:left;animation:lb 1.8s ease infinite}
+@keyframes lb{0%{opacity:1;transform:scaleX(0)}60%{opacity:1;transform:scaleX(1)}100%{opacity:0;transform:scaleX(1)}}
+#notif{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--border);padding:10px 16px;font-family:var(--fm);font-size:10px;color:var(--text);z-index:500;display:none;letter-spacing:.04em;max-width:320px}
+
+/* APP */
+#app{display:flex;height:100vh}
+
+/* SIDEBAR */
+#sb{width:230px;background:var(--bg2);border-right:1px solid var(--border2);display:flex;flex-direction:column;flex-shrink:0}
+.sb-head{padding:22px 18px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:11px}
+.sb-mark{width:32px;height:32px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-weight:700;font-size:11px;color:#000;flex-shrink:0}
+.sb-name{font-size:14px;font-weight:800;letter-spacing:.06em}
+.sb-ver{font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.1em;margin-top:1px}
+.sb-sec{padding:14px 0 3px 18px;font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.18em}
+.ni{display:flex;align-items:center;gap:10px;padding:8px 18px;cursor:pointer;transition:all .15s;position:relative;font-size:12px;font-weight:600;color:var(--text2);letter-spacing:.02em}
+.ni:hover{color:var(--text);background:var(--bg3)}
+.ni.active{color:var(--gold);background:var(--gold3)}
+.ni.active::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--gold)}
+.ni-ico{width:15px;text-align:center;font-size:12px;flex-shrink:0}
+.ni-badge{margin-left:auto;background:var(--red);color:#fff;font-family:var(--fm);font-size:8px;padding:2px 5px;min-width:18px;text-align:center}
+.sb-footer{margin-top:auto;border-top:1px solid var(--border2)}
+.sb-score{padding:14px 18px}
+.sb-score-lbl{font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.14em;margin-bottom:8px}
+.sb-score-row{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.sb-score-num{font-family:var(--fm);font-size:20px;font-weight:700;color:var(--gold);line-height:1;width:40px}
+.sb-score-bar{flex:1;height:2px;background:var(--bg4)}
+.sb-score-fill{height:100%;background:var(--gold);transition:width .8s ease}
+.sb-score-status{font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.1em}
+.sb-time{padding:10px 18px;font-family:var(--fm);font-size:9px;color:var(--text3);letter-spacing:.05em;border-top:1px solid var(--border2)}
+
+/* TOPBAR */
+#topbar{height:50px;background:var(--bg2);border-bottom:1px solid var(--border2);display:flex;align-items:center;padding:0 22px;gap:14px;flex-shrink:0}
+#ptitle{font-size:14px;font-weight:700;letter-spacing:.04em}
+#psub{font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.12em}
+.tb-sep{flex:1}
+.tb-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px rgba(76,175,110,.5);animation:pulse 2s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.tb-btn{background:none;border:1px solid var(--border2);color:var(--text2);padding:5px 12px;font-family:var(--fm);font-size:8px;letter-spacing:.08em;cursor:pointer;transition:all .15s}
+.tb-btn:hover{border-color:var(--border);color:var(--text)}
+
+/* CONTENT */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#content{flex:1;overflow:hidden;position:relative}
+.view{position:absolute;inset:0;overflow-y:auto;padding:22px;display:none}
+.view.active{display:block}
+#view-ai{padding:0!important;flex-direction:column}
+#view-ai.active{display:flex}
+
+/* PANELS */
+.panel{background:var(--bg2);border:1px solid var(--border2);padding:18px;margin-bottom:14px;position:relative}
+.panel::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,var(--gold),transparent);opacity:.2}
+.pt{font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.16em;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.pt::before{content:"//";color:var(--gold);opacity:.5}
+.cr{position:absolute;width:6px;height:6px;border-color:rgba(201,168,76,.25);border-style:solid}
+.cr.tl{top:0;left:0;border-width:1px 0 0 1px}
+.cr.tr{top:0;right:0;border-width:1px 1px 0 0}
+.cr.bl{bottom:0;left:0;border-width:0 0 1px 1px}
+.cr.br{bottom:0;right:0;border-width:0 1px 1px 0}
+
+/* METRICS */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.metric{background:var(--bg2);border:1px solid var(--border2);padding:14px;position:relative}
+.metric::after{content:"";position:absolute;bottom:0;left:0;right:0;height:1px;background:var(--gold);opacity:.1}
+.m-label{font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.14em;margin-bottom:7px}
+.m-value{font-family:var(--fm);font-size:20px;font-weight:700;line-height:1}
+.m-value.gold{color:var(--gold)}
+.m-sub{font-family:var(--fm);font-size:8px;color:var(--text3);margin-top:4px}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+
+/* TAGS */
+.tag{font-family:var(--fm);font-size:8px;padding:2px 7px;letter-spacing:.07em;display:inline-block}
+.tag.live{background:rgba(76,175,110,.1);color:var(--green);border:1px solid rgba(76,175,110,.2)}
+.tag.build{background:rgba(201,168,76,.1);color:var(--gold);border:1px solid rgba(201,168,76,.2)}
+.tag.dev{background:rgba(232,228,217,.05);color:var(--text3);border:1px solid var(--border2)}
+.tag.warn{background:rgba(201,168,76,.1);color:var(--gold)}
+.tag.crit{background:rgba(224,82,82,.1);color:var(--red)}
+
+/* TASKS */
+.ti{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--border2);cursor:pointer;transition:background .1s}
+.ti:hover{background:var(--bg3);margin:0 -18px;padding:9px 18px}
+.ti.done{opacity:.4}
+.tk{width:14px;height:14px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:8px;color:var(--gold);flex-shrink:0}
+.ti.done .tk{background:var(--gold3);border-color:var(--gold)}
+.tprio{width:2px;height:24px;flex-shrink:0}
+.ttext{flex:1;font-size:12px;line-height:1.4}
+.ttag{font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.06em}
+
+/* BUTTONS */
+.btn{background:none;border:1px solid var(--border2);color:var(--text2);padding:6px 13px;font-family:var(--fm);font-size:8px;letter-spacing:.08em;cursor:pointer;transition:all .15s}
+.btn:hover{border-color:var(--border);color:var(--text)}
+.btn.primary{background:var(--gold);color:#000;border-color:var(--gold);font-weight:700}
+.btn.primary:hover{opacity:.85}
+.btn.danger{border-color:rgba(224,82,82,.3);color:var(--red)}
+.btn.danger:hover{background:rgba(224,82,82,.08)}
+.btn-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+
+/* INPUTS */
+.inp{background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:8px 12px;font-family:var(--fs);font-size:12px;outline:none;width:100%;transition:border-color .2s}
+.inp:focus{border-color:rgba(201,168,76,.3)}
+select.inp option{background:var(--bg3)}
+.inp-label{font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.12em;margin-bottom:5px;display:block}
+.inp-group{margin-bottom:11px}
+.inp-row{display:flex;gap:8px;margin-bottom:11px}
+
+/* MODALS */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;display:none;align-items:center;justify-content:center}
+.mo.open{display:flex}
+.mo-box{background:var(--bg2);border:1px solid var(--border);padding:26px;width:400px;max-width:95vw;position:relative;max-height:90vh;overflow-y:auto}
+.mo-box::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:var(--gold);opacity:.35}
+.mo-title{font-size:14px;font-weight:700;margin-bottom:18px;letter-spacing:.03em}
+.mo-x{position:absolute;top:14px;right:14px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1}
+.mo-x:hover{color:var(--text)}
+
+/* AI CHAT */
+#cm{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.msg{display:flex;flex-direction:column;gap:4px}
+.mr{font-family:var(--fm);font-size:8px;letter-spacing:.15em;color:var(--text3)}
+.mr.ai{color:var(--gold)}
+.mc2{font-size:13px;line-height:1.7;max-width:680px}
+.mc2.tp{display:flex;gap:4px;align-items:center;padding:4px 0}
+.mc2.tp span{width:4px;height:4px;background:var(--gold);border-radius:50%;animation:tp .8s ease infinite}
+.mc2.tp span:nth-child(2){animation-delay:.15s}
+.mc2.tp span:nth-child(3){animation-delay:.3s}
+@keyframes tp{0%,80%,100%{opacity:.2}40%{opacity:1}}
+.qas{display:flex;flex-wrap:wrap;gap:5px;padding:0 18px 12px}
+.qa{background:var(--bg3);border:1px solid var(--border2);color:var(--text2);padding:5px 11px;font-family:var(--fm);font-size:8px;letter-spacing:.05em;cursor:pointer;transition:all .15s}
+.qa:hover{border-color:var(--border);color:var(--text)}
+#ci-row{padding:14px 18px;border-top:1px solid var(--border2);display:flex;gap:9px}
+#ci{flex:1;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:9px 13px;font-family:var(--fs);font-size:13px;outline:none}
+#ci:focus{border-color:rgba(201,168,76,.25)}
+#ci-send{background:var(--gold);color:#000;border:none;padding:9px 16px;font-family:var(--fm);font-size:9px;font-weight:700;letter-spacing:.08em;cursor:pointer}
+
+/* CHART */
+.chart-bars{display:flex;align-items:flex-end;gap:4px;height:56px}
+.cb{flex:1;background:var(--bg4);border-top:1px solid var(--border2);min-height:3px;transition:height .5s}
+.cb.hi{background:var(--gold2);border-top-color:var(--gold)}
+.chart-labels{display:flex;gap:4px;margin-top:5px}
+.chart-labels span{flex:1;font-family:var(--fm);font-size:7px;color:var(--text3);text-align:center}
+
+/* BIZ CARDS */
+.bc{background:var(--bg2);border:1px solid var(--border2);padding:16px;position:relative}
+.bh{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.bi{width:34px;height:34px;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.bn{font-size:13px;font-weight:700}
+.bt{font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.06em;margin-top:2px}
+.bstats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:11px}
+.bs-lbl{font-family:var(--fm);font-size:7px;color:var(--text3);letter-spacing:.1em;margin-bottom:3px}
+.bs-val{font-family:var(--fm);font-size:14px;font-weight:700}
+.prog-row{display:flex;justify-content:space-between;font-family:var(--fm);font-size:7px;color:var(--text3);margin-bottom:4px}
+.prog-bar{height:1px;background:var(--bg4)}
+.prog-fill{height:100%;background:var(--gold);transition:width .7s}
+
+/* TRENDS */
+.tr2{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.tc{font-family:var(--fm);font-size:8px;color:var(--text2);letter-spacing:.07em;width:85px;flex-shrink:0}
+.tbw{flex:1;height:1px;background:var(--bg4);position:relative}
+.tbar{height:1px;background:var(--gold);position:absolute;top:0;left:0;transition:width .8s}
+.tp3{font-family:var(--fm);font-size:8px;color:var(--gold);width:28px;text-align:right;flex-shrink:0}
+.ttg{font-family:var(--fm);font-size:7px;color:var(--text3);width:65px;text-align:right;flex-shrink:0}
+
+/* STATUS DOT */
+.sdot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.sdot.g{background:var(--green);box-shadow:0 0 4px rgba(76,175,110,.6)}
+.sdot.a{background:var(--gold);box-shadow:0 0 4px rgba(201,168,76,.6)}
+.sdot.r{background:var(--red);box-shadow:0 0 4px rgba(224,82,82,.6)}
+
+/* AGENT CARDS */
+.ac{background:var(--bg2);border:1px solid var(--border2);padding:16px}
+.ah{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.an{font-size:12px;font-weight:700}
+.ar{font-family:var(--fm);font-size:8px;color:var(--text3);margin-top:1px;letter-spacing:.05em}
+.as2{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.atl{margin-bottom:11px}
+.ati{font-size:10px;color:var(--text2);padding:3px 0;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:6px}
+.ati::before{content:"›";color:var(--gold);opacity:.5}
+.arb{width:100%;background:var(--gold2);border:1px solid rgba(201,168,76,.2);color:var(--gold);padding:7px;font-family:var(--fm);font-size:8px;letter-spacing:.1em;cursor:pointer;transition:all .2s}
+.arb:hover{background:var(--gold);color:#000}
+
+/* CONTENT */
+.ci2{background:var(--bg3);border:1px solid var(--border2);padding:13px;margin-bottom:7px}
+.cih{display:flex;align-items:center;gap:7px;margin-bottom:7px;flex-wrap:wrap}
+.cib{font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:9px}
+.cia{display:flex;gap:6px}
+.cbtn{background:none;border:1px solid var(--border2);color:var(--text2);padding:4px 10px;font-family:var(--fm);font-size:8px;letter-spacing:.05em;cursor:pointer;transition:all .15s}
+.cbtn:hover{border-color:var(--border);color:var(--text)}
+.cbtn.ap{border-color:rgba(76,175,110,.3);color:var(--green)}
+
+/* DATABASE TABLE */
+.dbt{width:100%;border-collapse:collapse;font-size:11px}
+.dbt th{font-family:var(--fm);font-size:7px;color:var(--text3);letter-spacing:.12em;padding:7px 10px;border-bottom:1px solid var(--border2);text-align:left;white-space:nowrap}
+.dbt td{padding:8px 10px;border-bottom:1px solid var(--border2);color:var(--text2)}
+.dbt tr:hover td{background:var(--bg3)}
+.dcn{color:var(--text);font-weight:600}
+.dcm{font-family:var(--fm);font-size:10px;color:var(--gold)}
+.badge{background:var(--bg4);border:1px solid var(--border2);font-family:var(--fm);font-size:7px;padding:1px 6px;color:var(--text2)}
+
+/* KNOWLEDGE */
+.ki{background:var(--bg3);border:1px solid var(--border2);padding:13px;margin-bottom:7px;transition:border-color .15s;cursor:default}
+.ki:hover{border-color:var(--border)}
+.ktt{font-size:12px;font-weight:600;margin-bottom:4px}
+.ke{font-size:10px;color:var(--text2);line-height:1.6;margin-bottom:7px}
+.km{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.ktg{font-family:var(--fm);font-size:7px;background:var(--gold3);border:1px solid rgba(201,168,76,.15);color:var(--gold);padding:2px 6px}
+
+/* FINANCE */
+#fin-total{font-family:var(--fm);font-size:18px;font-weight:700;color:var(--green)}
+#fin-exp{font-family:var(--fm);font-size:18px;font-weight:700;color:var(--red)}
+#fin-net{font-family:var(--fm);font-size:18px;font-weight:700;color:var(--gold)}
+#fin-entries{font-family:var(--fm);font-size:18px;font-weight:700}
+
+/* ROADMAP */
+.pc{background:var(--bg2);border:1px solid var(--border2);padding:16px;position:relative}
+.pc.active{border-color:rgba(201,168,76,.3)}
+.pc.active::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:var(--gold);opacity:.35}
+.pnum{font-family:var(--fm);font-size:8px;color:var(--gold);letter-spacing:.18em;margin-bottom:3px}
+.ptit{font-size:13px;font-weight:700;margin-bottom:3px}
+.prng{font-family:var(--fm);font-size:8px;color:var(--text3);margin-bottom:11px;letter-spacing:.04em}
+.pit{font-size:11px;color:var(--text2);padding:3px 0;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:6px}
+.pit::before{content:"◦";color:var(--text3)}
+.pit.done{color:var(--text3);text-decoration:line-through}
+.pit.done::before{content:"✓";color:var(--gold)}
+
+/* GUARDIAN */
+.g-ring-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px}
+.g-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.g-stat{text-align:center;padding:11px;background:var(--bg3);border:1px solid var(--border2)}
+.g-stat-v{font-family:var(--fm);font-size:15px;font-weight:700}
+.g-stat-l{font-family:var(--fm);font-size:7px;color:var(--text3);letter-spacing:.1em;margin-top:4px}
+.g-backup-item{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border2)}
+.g-backup-date{font-family:var(--fm);font-size:9px;width:85px;flex-shrink:0}
+.g-backup-rows{font-family:var(--fm);font-size:8px;color:var(--text3);flex:1}
+.g-alert-item{display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px solid var(--border2)}
+.g-alert-msg{font-size:11px;color:var(--text2);flex:1;line-height:1.4}
+.g-alert-type{font-family:var(--fm);font-size:8px;color:var(--text3);margin-top:3px;letter-spacing:.04em}
+</style>
+</head>
+<body>
+
+<div id="loading-bar"></div>
+<div id="notif"></div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="l-glow"></div>
+  <div class="l-box">
+    <div class="l-logo">
+      <div class="l-mark">AT</div>
+      <div>
+        <div class="l-title">ATLAS</div>
+        <div class="l-sub">AI BUSINESS OPERATING SYSTEM</div>
+      </div>
+    </div>
+    <div class="l-panel">
+      <div class="lc tl"></div><div class="lc tr"></div>
+      <div class="lc bl"></div><div class="lc br"></div>
+      <div class="l-ptitle">SYSTEM ACCESS</div>
+      <label class="lf-label">OPERATOR EMAIL</label>
+      <input class="lf-input" id="login-email" type="email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')doLogin()">
+      <label class="lf-label">PASSKEY</label>
+      <input class="lf-input" id="login-password" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="l-btn" id="login-btn" onclick="doLogin()">INITIATE ACCESS ↗</button>
+      <div id="login-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+
+  <!-- SIDEBAR -->
+  <div id="sb">
+    <div class="sb-head">
+      <div class="sb-mark">AT</div>
+      <div><div class="sb-name">ATLAS</div><div class="sb-ver">AABOS v4.0</div></div>
+    </div>
+    <div class="sb-sec">OPERATIONS</div>
+    <div class="ni active" onclick="nav('dashboard')"><div class="ni-ico">◈</div>Dashboard</div>
+    <div class="ni" onclick="nav('ai')"><div class="ni-ico">◎</div>AI Command</div>
+    <div class="ni" onclick="nav('tasks')"><div class="ni-ico">◻</div>Tasks<span class="ni-badge" id="tkbadge">0</span></div>
+    <div class="ni" onclick="nav('businesses')"><div class="ni-ico">◆</div>Businesses</div>
+    <div class="ni" onclick="nav('finance')"><div class="ni-ico">◇</div>Finance</div>
+    <div class="sb-sec">INTELLIGENCE</div>
+    <div class="ni" onclick="nav('agents')"><div class="ni-ico">◉</div>AI Agents</div>
+    <div class="ni" onclick="nav('trends')"><div class="ni-ico">▲</div>Trends</div>
+    <div class="ni" onclick="nav('content')"><div class="ni-ico">▣</div>Content</div>
+    <div class="ni" onclick="nav('knowledge')"><div class="ni-ico">◈</div>Knowledge</div>
+    <div class="ni" onclick="nav('affiliate')"><div class="ni-ico">◌</div>Affiliate</div>
+    <div class="sb-sec">SYSTEM</div>
+    <div class="ni" onclick="nav('guardian')"><div class="ni-ico">◍</div>Guardian</div>
+    <div class="ni" onclick="nav('database')"><div class="ni-ico">▦</div>Database</div>
+    <div class="ni" onclick="nav('roadmap')"><div class="ni-ico">▷</div>Roadmap</div>
+    <div class="sb-footer">
+      <div class="sb-score">
+        <div class="sb-score-lbl">GUARDIAN SCORE</div>
+        <div class="sb-score-row">
+          <div class="sb-score-num" id="sb-gscore">—</div>
+          <div class="sb-score-bar"><div class="sb-score-fill" id="sb-gfill" style="width:0"></div></div>
+        </div>
+        <div class="sb-score-status" id="sb-gstatus">INITIALIZING</div>
+      </div>
+      <div class="sb-time" id="clk">—</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main">
+    <div id="topbar">
+      <div><div id="ptitle">Dashboard</div><div id="psub">AABOS OVERVIEW</div></div>
+      <div class="tb-sep"></div>
+      <div class="tb-dot" title="Online"></div>
+      <button class="tb-btn" onclick="loadAllData()">⟳ SYNC</button>
+      <button class="tb-btn" onclick="exportData()">↓ EXPORT</button>
+    </div>
+    <div id="content">
+
+      <!-- DASHBOARD -->
+      <div class="view active" id="view-dashboard">
+        <div class="metrics">
+          <div class="metric"><div class="m-label">TOTAL REVENUE</div><div class="m-value gold" id="m-rev">R0</div><div class="m-sub">All time</div></div>
+          <div class="metric"><div class="m-label">ACTIVE TASKS</div><div class="m-value" id="m-tasks">0</div><div class="m-sub">Pending</div></div>
+          <div class="metric"><div class="m-label">CONTENT QUEUE</div><div class="m-value" id="m-content">0</div><div class="m-sub">Items</div></div>
+          <div class="metric"><div class="m-label">AFFILIATES</div><div class="m-value" id="m-aff">0</div><div class="m-sub">Active</div></div>
+        </div>
+        <div class="g2">
+          <div>
+            <div class="panel"><div class="cr tl"></div><div class="cr tr"></div><div class="cr bl"></div><div class="cr br"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <div class="pt" style="margin:0">REVENUE TIMELINE</div>
+                <div style="font-family:var(--fm);font-size:13px;color:var(--gold)" id="chart-total">R0</div>
+              </div>
+              <div class="chart-bars" id="dash-chart"><div class="cb" style="height:4%"></div></div>
+              <div class="chart-labels" id="chart-labels"></div>
+              <div class="btn-row"><button class="btn primary" onclick="openModal('addRev')">+ LOG REVENUE</button></div>
+            </div>
+            <div class="panel"><div class="cr tl"></div><div class="cr tr"></div>
+              <div class="pt">PRIORITY TASKS <span style="margin-left:auto;color:var(--gold)" id="tkcb">0</span></div>
+              <div id="dash-tasks"></div>
+              <div class="btn-row"><button class="btn" onclick="openModal('addTask')">+ ADD TASK</button></div>
+            </div>
+          </div>
+          <div>
+            <div class="panel"><div class="cr tl"></div><div class="cr tr"></div><div class="cr bl"></div><div class="cr br"></div>
+              <div class="pt">BUSINESS PORTFOLIO</div>
+              <div id="dash-biz"></div>
+            </div>
+            <div class="panel"><div class="cr tl"></div><div class="cr tr"></div>
+              <div class="pt">MARKET SIGNALS</div>
+              <div id="dash-trends"></div>
+              <div class="btn-row"><button class="btn" onclick="qc('What are the top trending topics I should create content about this week for my South African business portfolio?')">AI INSIGHT ↗</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI -->
+      <div class="view" id="view-ai">
+        <div id="cm"></div>
+        <div class="qas">
+          <button class="qa" onclick="qc('What should I post today for ThriftVerse?')">ThriftVerse content</button>
+          <button class="qa" onclick="qc('Give me an Atlas Noir marketing strategy for this week')">Atlas Noir strategy</button>
+          <button class="qa" onclick="qc('What affiliate products should I promote this week?')">Affiliate intel</button>
+          <button class="qa" onclick="qc('Summarize my business performance and give 3 priorities')">Weekly priorities</button>
+          <button class="qa" onclick="qc('Give me a fragrance brand launch strategy for South Africa')">Fragrance launch</button>
+        </div>
+        <div id="ci-row">
+          <input id="ci" placeholder="Command ATLAS...">
+          <button id="ci-send" onclick="sendCmd()">EXECUTE ↗</button>
+        </div>
+      </div>
+
+      <!-- TASKS -->
+      <div class="view" id="view-tasks">
+        <div class="panel"><div class="cr tl"></div><div class="cr tr"></div><div class="cr bl"></div><div class="cr br"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div class="pt" style="margin:0">ACTIVE TASKS</div>
+            <button class="btn primary" onclick="openModal('addTask')">+ NEW TASK</button>
+          </div>
+          <div id="tasks-active"></div>
+        </div>
+        <div class="panel"><div class="pt">COMPLETED</div><div id="tasks-done"></div></div>
+      </div>
+
+      <!-- BUSINESSES -->
+      <div class="view" id="view-businesses">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+          <button class="btn primary" onclick="openModal('addBiz')">+ ADD BUSINESS</button>
+        </div>
+        <div class="g2" id="biz-grid"></div>
+      </div>
+
+      <!-- FINANCE -->
+      <div class="view" id="view-finance">
+        <div class="metrics">
+          <div class="metric"><div class="m-label">TOTAL REVENUE</div><div id="fin-total">R0</div></div>
+          <div class="metric"><div class="m-label">TOTAL EXPENSES</div><div id="fin-exp">R0</div></div>
+          <div class="metric"><div class="m-label">NET PROFIT</div><div id="fin-net">R0</div></div>
+          <div class="metric"><div class="m-label">TRANSACTIONS</div><div id="fin-entries" style="font-family:var(--fm);font-size:18px;font-weight:700">0</div></div>
+        </div>
+        <div class="g2">
+          <div class="panel"><div class="cr tl"></div><div class="cr tr"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <div class="pt" style="margin:0">REVENUE LOG</div>
+              <button class="btn primary" onclick="openModal('addRev')">+ LOG</button>
+            </div>
+            <div id="fin-logs"></div>
+          </div>
+          <div class="panel"><div class="cr tl"></div><div class="cr tr"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <div class="pt" style="margin:0">EXPENSES</div>
+              <button class="btn primary" onclick="openModal('addExpense')">+ ADD</button>
+            </div>
+            <div id="fin-expenses"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENTS -->
+      <div class="view" id="view-agents">
+        <div class="panel" style="margin-bottom:14px">
+          <div class="pt">AI WORKFORCE STATUS</div>
+          <div style="display:flex;gap:20px">
+            <div style="display:flex;align-items:center;gap:7px;font-family:var(--fm);font-size:9px;color:var(--green)"><div class="sdot g"></div>3 AGENTS RUNNING</div>
+            <div style="display:flex;align-items:center;gap:7px;font-family:var(--fm);font-size:9px;color:var(--text3)"><div class="sdot"></div>3 AGENTS IDLE</div>
+          </div>
+        </div>
+        <div class="g3" id="agents-grid"></div>
+      </div>
+
+      <!-- TRENDS -->
+      <div class="view" id="view-trends">
+        <div class="g2">
+          <div class="panel"><div class="cr tl"></div><div class="cr tr"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <div class="pt" style="margin:0">MARKET HEAT MAP</div>
+              <button class="btn primary" onclick="runScan()">⟳ SCAN</button>
+            </div>
+            <div id="trend-bars"></div>
+          </div>
+          <div class="panel"><div class="cr tl"></div><div class="cr tr"></div>
+            <div class="pt">OPPORTUNITIES</div>
+            <div id="trend-opps"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONTENT -->
+      <div class="view" id="view-content">
+        <div class="panel" style="margin-bottom:14px">
+          <div class="pt">GENERATE CONTENT</div>
+          <div class="inp-row">
+            <div style="flex:1"><label class="inp-label">TYPE</label><select class="inp" id="ct-type"><option>Pinterest Pin</option><option>Instagram Post</option><option>X Post</option><option>Blog Title</option><option>Story</option></select></div>
+            <div style="flex:1"><label class="inp-label">BUSINESS</label><select class="inp" id="ct-biz"><option>ThriftVerse</option><option>Atlas Noir</option><option>Fragrance Brand</option><option>Affiliate Engine</option></select></div>
+            <div style="flex:2"><label class="inp-label">TOPIC</label><input class="inp" id="ct-topic" placeholder="New drop, trending style..."></div>
+          </div>
+          <button class="btn primary" onclick="genContent()">⚡ GENERATE</button>
+        </div>
+        <div class="panel"><div class="pt">CONTENT QUEUE</div><div id="content-queue"></div></div>
+      </div>
+
+      <!-- DATABASE -->
+      <div class="view" id="view-database">
+        <div class="panel"><div class="cr tl"></div><div class="cr tr"></div>
+          <div class="pt">DATABASE VIEWER</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px" id="db-tabs">
+            <button class="btn" onclick="switchDB('products',this)" style="border-color:rgba(201,168,76,.3);color:var(--gold)">BUSINESSES</button>
+            <button class="btn" onclick="switchDB('content',this)">CONTENT</button>
+            <button class="btn" onclick="switchDB('affiliate',this)">AFFILIATES</button>
+            <button class="btn" onclick="switchDB('kpis',this)">REVENUE</button>
+          </div>
+          <div style="overflow-x:auto" id="db-content"></div>
+        </div>
+      </div>
+
+      <!-- KNOWLEDGE -->
+      <div class="view" id="view-knowledge">
+        <div style="display:flex;gap:14px">
+          <div style="width:180px;flex-shrink:0">
+            <div class="panel"><div class="pt">CATEGORIES</div><div id="know-cats"></div></div>
+          </div>
+          <div style="flex:1">
+            <div class="panel"><div class="cr tl"></div><div class="cr tr"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                <div class="pt" style="margin:0">VAULT ENTRIES</div>
+                <button class="btn primary" onclick="openModal('addKnowledge')">+ ADD</button>
+              </div>
+              <div id="know-entries"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AFFILIATE -->
+      <div class="view" id="view-affiliate">
+        <div class="panel"><div class="cr tl"></div><div class="cr tr"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div class="pt" style="margin:0">AFFILIATE ENGINE</div>
+            <button class="btn primary" onclick="openModal('addAffiliate')">+ ADD LINK</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="dbt"><thead><tr><th>PRODUCT</th><th>PLATFORM</th><th>URL</th><th>CONV%</th><th>COMM%</th><th>STATUS</th><th></th></tr></thead>
+            <tbody id="aff-body"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- GUARDIAN -->
+      <div class="view" id="view-guardian">
+        <div class="g2" style="margin-bottom:14px">
+          <div class="panel g-ring-wrap"><div class="cr tl"></div><div class="cr tr"></div><div class="cr bl"></div><div class="cr br"></div>
+            <svg width="156" height="156" viewBox="0 0 156 156">
+              <circle cx="78" cy="78" r="62" fill="none" stroke="rgba(201,168,76,.08)" stroke-width="8"/>
+              <circle cx="78" cy="78" r="62" fill="none" stroke="var(--gold)" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="390" stroke-dashoffset="390"
+                transform="rotate(-90 78 78)" id="g-arc" style="transition:stroke-dashoffset 1.2s ease,stroke .4s"/>
+              <text x="78" y="70" text-anchor="middle" font-family="Space Mono,monospace" font-size="30" font-weight="700" fill="#c9a84c" id="g-ring-score">—</text>
+              <text x="78" y="90" text-anchor="middle" font-family="Space Mono,monospace" font-size="8" fill="rgba(232,228,217,.3)" letter-spacing="3" id="g-ring-status">LOADING</text>
+            </svg>
+            <div style="font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.16em;margin-top:10px">GUARDIAN SCORE</div>
+            <div class="g-stats" id="g-stats-grid"></div>
+          </div>
+          <div class="panel"><div class="cr tl"></div><div class="cr tr"></div>
+            <div class="pt">SYSTEM STATUS</div>
+            <div id="g-backup-list" style="margin-bottom:14px"></div>
+            <div class="pt" style="margin-top:14px">ACTIVE ALERTS</div>
+            <div id="g-alerts-list"></div>
+            <div class="btn-row" style="margin-top:18px">
+              <button class="btn primary" onclick="runGuardianScan()">⟳ HEALTH SCAN</button>
+              <button class="btn" onclick="runGuardianBackup()">↑ BACKUP NOW</button>
+              <a id="g-gh-link" href="https://github.com/carloskanye/atlas-guardian-backups" target="_blank" style="text-decoration:none"><button class="btn">↗ GITHUB</button></a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROADMAP -->
+      <div class="view" id="view-roadmap">
+        <div class="panel" style="margin-bottom:14px">
+          <div class="pt">ATLAS ENGINEERING ROADMAP</div>
+          <div style="font-family:var(--fm);font-size:8px;color:var(--text3);letter-spacing:.05em">Atlas OS — 4-phase evolution to full autonomous operation</div>
+        </div>
+        <div class="g2" id="roadmap-grid"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="mo" id="modal-addTask"><div class="mo-box">
+  <div class="mo-title">NEW TASK</div><button class="mo-x" onclick="closeModal('addTask')">×</button>
+  <div class="inp-group"><label class="inp-label">DESCRIPTION</label><input class="inp" id="nt-text" placeholder="Task description..."></div>
+  <div class="inp-row">
+    <div style="flex:1"><label class="inp-label">TAG</label><input class="inp" id="nt-tag" value="#ATLAS"></div>
+    <div style="flex:1"><label class="inp-label">PRIORITY</label><select class="inp" id="nt-prio"><option value="high">HIGH</option><option value="medium" selected>MEDIUM</option><option value="low">LOW</option></select></div>
+  </div>
+  <button class="btn primary" onclick="addTask()" style="width:100%">CREATE TASK</button>
+</div></div>
+
+<div class="mo" id="modal-addBiz"><div class="mo-box">
+  <div class="mo-title">NEW BUSINESS</div><button class="mo-x" onclick="closeModal('addBiz')">×</button>
+  <div class="inp-group"><label class="inp-label">NAME</label><input class="inp" id="nb-name" placeholder="Business name"></div>
+  <div class="inp-group"><label class="inp-label">TYPE</label><input class="inp" id="nb-type" placeholder="Marketplace, Brand..."></div>
+  <div class="inp-row">
+    <div style="flex:1"><label class="inp-label">ICON</label><input class="inp" id="nb-icon" value="🏢"></div>
+    <div style="flex:1"><label class="inp-label">PHASE</label><select class="inp" id="nb-phase"><option>Idea</option><option>Building</option><option>Live</option></select></div>
+  </div>
+  <div class="inp-row">
+    <div style="flex:1"><label class="inp-label">MONTHLY REV (R)</label><input class="inp" id="nb-rev" type="number" placeholder="0"></div>
+    <div style="flex:1"><label class="inp-label">TARGET (R)</label><input class="inp" id="nb-target" type="number" value="10000"></div>
+  </div>
+  <button class="btn primary" onclick="addBusiness()" style="width:100%">ADD BUSINESS</button>
+</div></div>
+
+<div class="mo" id="modal-addRev"><div class="mo-box">
+  <div class="mo-title">LOG REVENUE</div><button class="mo-x" onclick="closeModal('addRev')">×</button>
+  <div class="inp-group"><label class="inp-label">AMOUNT (R)</label><input class="inp" id="nr-amount" type="number" placeholder="0.00"></div>
+  <div class="inp-group"><label class="inp-label">SOURCE</label><select class="inp" id="nr-src"><option>ThriftVerse</option><option>Atlas Noir</option><option>Fragrance</option><option>Affiliate</option><option>Other</option></select></div>
+  <div class="inp-group"><label class="inp-label">NOTE</label><input class="inp" id="nr-note" placeholder="Optional note"></div>
+  <button class="btn primary" onclick="logRevenueModal()" style="width:100%">LOG REVENUE</button>
+</div></div>
+
+<div class="mo" id="modal-addExpense"><div class="mo-box">
+  <div class="mo-title">LOG EXPENSE</div><button class="mo-x" onclick="closeModal('addExpense')">×</button>
+  <div class="inp-group"><label class="inp-label">DESCRIPTION</label><input class="inp" id="ne-desc" placeholder="Expense description"></div>
+  <div class="inp-row">
+    <div style="flex:1"><label class="inp-label">AMOUNT (R)</label><input class="inp" id="ne-amount" type="number" placeholder="0.00"></div>
+    <div style="flex:1"><label class="inp-label">CATEGORY</label><select class="inp" id="ne-cat"><option>Marketing</option><option>Software</option><option>Materials</option><option>Travel</option><option>Other</option></select></div>
+  </div>
+  <button class="btn primary" onclick="addExpense()" style="width:100%">LOG EXPENSE</button>
+</div></div>
+
+<div class="mo" id="modal-addAffiliate"><div class="mo-box">
+  <div class="mo-title">NEW AFFILIATE LINK</div><button class="mo-x" onclick="closeModal('addAffiliate')">×</button>
+  <div class="inp-group"><label class="inp-label">PRODUCT NAME</label><input class="inp" id="na-name" placeholder="Product name"></div>
+  <div class="inp-row">
+    <div style="flex:1"><label class="inp-label">PLATFORM</label><select class="inp" id="na-platform"><option>Pinterest</option><option>Blog</option><option>Instagram</option><option>YouTube</option><option>Email</option></select></div>
+    <div style="flex:2"><label class="inp-label">URL</label><input class="inp" id="na-url" placeholder="https://..."></div>
+  </div>
+  <div class="inp-row">
+    <div style="flex:1"><label class="inp-label">CONV %</label><input class="inp" id="na-conv" type="number" placeholder="0"></div>
+    <div style="flex:1"><label class="inp-label">COMM %</label><input class="inp" id="na-comm" type="number" placeholder="0"></div>
+  </div>
+  <button class="btn primary" onclick="addAffiliate()" style="width:100%">ADD LINK</button>
+</div></div>
+
+<div class="mo" id="modal-addKnowledge"><div class="mo-box">
+  <div class="mo-title">ADD TO VAULT</div><button class="mo-x" onclick="closeModal('addKnowledge')">×</button>
+  <div class="inp-group"><label class="inp-label">TITLE</label><input class="inp" id="nk-title" placeholder="Entry title"></div>
+  <div class="inp-group"><label class="inp-label">CATEGORY</label><select class="inp" id="nk-cat"><option>Business</option><option>Marketing</option><option>Technology</option><option>Finance</option><option>Psychology</option><option>Creativity</option></select></div>
+  <div class="inp-group"><label class="inp-label">CONTENT</label><textarea class="inp" id="nk-content" placeholder="Knowledge entry..." style="height:90px;resize:vertical"></textarea></div>
+  <button class="btn primary" onclick="addKnowledge()" style="width:100%">SAVE TO VAULT</button>
+</div></div>
+
+<input type="file" id="importFile" accept=".json" style="display:none" onchange="doImport(event)">
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────
+const SUPABASE_URL='https://fdtkxjmryyjifkcekoxc.supabase.co';
+const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkdGt4am1yeXlqaWZrY2Vrb3hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMTEyNDksImV4cCI6MjA5Njc4NzI0OX0.QsiPNYIS8JtBxRkCVETc--ph-MpgOgxoFVg2KlMIk_M';
+const GATEWAY_URL='https://fdtkxjmryyjifkcekoxc.supabase.co/functions/v1/ai-gateway';
+const GUARDIAN_HEALTH_URL='https://fdtkxjmryyjifkcekoxc.supabase.co/functions/v1/guardian-health';
+const GUARDIAN_BACKUP_URL='https://fdtkxjmryyjifkcekoxc.supabase.co/functions/v1/guardian-backup';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+
+// ── STATE ─────────────────────────────────────────────────────
+const S={tasks:[],businesses:[],revenues:[],expenses:[],affiliates:[],contentQueue:[],trends:[],knowledge:[],chatHistory:[],dbView:'products',user:null};
+const GD={score:null,status:null,alerts:[],manifests:[]};
+
+// ── MAPPERS ───────────────────────────────────────────────────
+const fromDB={
+  task:r=>({id:r.id,text:r.text,tag:r.tag,prio:r.priority,done:r.done}),
+  business:r=>({id:r.id,name:r.name,type:r.type,phase:r.phase,icon:r.icon||'🏢',revenue:Number(r.revenue)||0,target:Number(r.target)||10000}),
+  revenue:r=>({id:r.id,amount:Number(r.amount),src:r.source,note:r.note||'',date:r.logged_date}),
+  expense:r=>({id:r.id,desc:r.description,amount:Number(r.amount),cat:r.category,date:r.expense_date}),
+  affiliate:r=>({id:r.id,name:r.name,platform:r.platform,url:r.url||'#',conv:String(r.conversion_pct||0),comm:String(r.commission_pct||0),status:r.status}),
+  content:r=>({id:r.id,type:r.type,biz:r.business,text:r.body,status:r.status,date:r.created_at?.split('T')[0]||today()}),
+  trend:r=>({cat:r.category,score:Number(r.score),tag:r.tag}),
+  knowledge:r=>({id:r.id,title:r.title,cat:r.category,content:r.content,tags:r.tags||[]})
+};
+
+function today(){return new Date().toISOString().split('T')[0];}
+function esc(s){if(typeof s!=='string')return String(s||'');return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+// ── DATA LOAD ─────────────────────────────────────────────────
+async function loadAllData(){
+  showLoading(true);
+  try{
+    const[tasks,businesses,revenues,expenses,affiliates,content,knowledge]=await Promise.all([
+      sb.from('tasks').select('*').order('created_at'),
+      sb.from('businesses').select('*').order('created_at'),
+      sb.from('revenue_logs').select('*').order('logged_date',{ascending:false}),
+      sb.from('expenses').select('*').order('expense_date',{ascending:false}),
+      sb.from('affiliate_links').select('*').order('created_at'),
+      sb.from('content_queue').select('*').filter('deleted_at','is',null).order('created_at',{ascending:false}),
+      sb.from('knowledge').select('*').order('created_at',{ascending:false})
+    ]);
+    S.tasks=(tasks.data||[]).map(fromDB.task);
+    S.businesses=(businesses.data||[]).map(fromDB.business);
+    S.revenues=(revenues.data||[]).map(fromDB.revenue);
+    S.expenses=(expenses.data||[]).map(fromDB.expense);
+    S.affiliates=(affiliates.data||[]).map(fromDB.affiliate);
+    S.contentQueue=(content.data||[]).map(fromDB.content);
+    S.knowledge=(knowledge.data||[]).map(fromDB.knowledge);
+    const{data:td}=await sb.from('trends').select('*').order('scanned_at',{ascending:false}).limit(30);
+    if(td&&td.length>0){const seen=new Set();S.trends=td.filter(t=>seen.has(t.category)?false:seen.add(t.category)).map(fromDB.trend);}
+    else{S.trends=[{cat:'FASHION',score:91,tag:'🔥 HOT'},{cat:'STREETWEAR',score:78,tag:'📈 RISING'},{cat:'FRAGRANCE',score:64,tag:'👀 WATCH'},{cat:'LUXURY',score:55,tag:'💡 OPP'},{cat:'AI/TECH',score:48,tag:'📊 STABLE'},{cat:'ENTREPRENEUR',score:39,tag:'📊 STABLE'}];}
+    if(S.businesses.length===0){await sb.rpc('seed_atlas_defaults',{p_user_id:S.user.id});const{data:b2}=await sb.from('businesses').select('*').order('created_at');S.businesses=(b2||[]).map(fromDB.business);const{data:t2}=await sb.from('tasks').select('*').order('created_at');S.tasks=(t2||[]).map(fromDB.task);}
+    showLoading(false);updateBadges();renderDashboard();loadGuardianData();
+    notify('✅ Atlas synchronized');
+  }catch(e){showLoading(false);notify('⚠️ Sync error: '+e.message,'err');}
+}
+
+function showLoading(s){const el=document.getElementById('loading-bar');if(el)el.style.display=s?'block':'none';}
+
+// ── AUTH ──────────────────────────────────────────────────────
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-password').value;
+  const errEl=document.getElementById('login-error');
+  const btn=document.getElementById('login-btn');
+  if(!email||!pass){showLoginErr('Enter email and passkey');return;}
+  btn.textContent='AUTHENTICATING...';btn.disabled=true;
+  const{data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  if(error){showLoginErr(error.message);btn.textContent='INITIATE ACCESS ↗';btn.disabled=false;return;}
+  S.user=data.user;
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  await loadAllData();
+}
+function showLoginErr(m){const el=document.getElementById('login-error');el.textContent=m;el.style.display='block';}
+async function checkSession(){const{data:{session}}=await sb.auth.getSession();if(session){S.user=session.user;document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='flex';await loadAllData();}}
+async function getToken(){const{data:{session}}=await sb.auth.getSession();return session?.access_token||null;}
+
+// ── NAVIGATION ────────────────────────────────────────────────
+const TITLES={dashboard:'Dashboard',ai:'AI Command',businesses:'Businesses',finance:'Finance',affiliate:'Affiliate Engine',trends:'Trend Intelligence',content:'Content Engine',agents:'AI Workforce',database:'Database',knowledge:'Knowledge Vault',tasks:'Task Manager',roadmap:'Phase Roadmap',guardian:'Guardian Department'};
+const SUBS={dashboard:'AABOS OVERVIEW',ai:'ASK ATLAS ANYTHING',businesses:'REVENUE PORTFOLIO',finance:'TRACK EVERY RAND',affiliate:'LINKS & COMMISSIONS',trends:'MARKET INTELLIGENCE',content:'CREATE & SCHEDULE',agents:'SIX AI AGENTS',database:'CENTRAL MEMORY',knowledge:'SECOND BRAIN',tasks:'PRIORITY OPS',roadmap:'0 TO AUTONOMOUS',guardian:'SYSTEM PROTECTION'};
+function nav(p){
+  document.querySelectorAll('.view').forEach(v=>{v.classList.remove('active');v.style.display='none';});
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  const vEl=document.getElementById('view-'+p);
+  if(vEl){vEl.classList.add('active');vEl.style.display=p==='ai'?'flex':'block';}
+  document.querySelectorAll('.ni').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+p+"'"))n.classList.add('active');});
+  document.getElementById('ptitle').textContent=TITLES[p]||p;
+  document.getElementById('psub').textContent=SUBS[p]||'';
+  const fns={dashboard:renderDashboard,tasks:renderTasks,businesses:renderBiz,agents:renderAgents,trends:renderTrends,content:renderContent,database:renderDB,knowledge:renderKnowledge,finance:renderFinance,affiliate:renderAffiliate,roadmap:renderRoadmap,guardian:renderGuardian};
+  if(fns[p])fns[p]();
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────
+function renderDashboard(){
+  const active=S.tasks.filter(t=>!t.done);
+  const totalRev=S.revenues.reduce((a,r)=>a+Number(r.amount),0);
+  document.getElementById('m-rev').textContent='R'+totalRev.toLocaleString();
+  document.getElementById('m-tasks').textContent=active.length;
+  document.getElementById('m-content').textContent=S.contentQueue.length;
+  document.getElementById('m-aff').textContent=S.affiliates.filter(a=>a.status==='Active').length;
+  document.getElementById('tkcb').textContent=active.length;
+  const pc={high:'var(--red)',medium:'var(--gold)',low:'var(--text3)'};
+  document.getElementById('dash-tasks').innerHTML=active.slice(0,5).map((t,i)=>`
+    <div class="ti ${t.done?'done':''}" onclick="toggleTask('${t.id}')">
+      <div class="tk">${t.done?'✓':''}</div>
+      <div class="tprio" style="background:${pc[t.prio]||'var(--text3)'}"></div>
+      <div class="ttext">${String(i+1).padStart(2,'0')}. ${esc(t.text)}</div>
+      <div class="ttag">${t.tag}</div>
+    </div>`).join('')||'<div style="color:var(--text3);font-size:11px;padding:8px;font-family:var(--fm)">NO ACTIVE TASKS</div>';
+  document.getElementById('dash-biz').innerHTML=S.businesses.map(b=>`
+    <div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border2)">
+      <div style="width:28px;height:28px;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:15px">${b.icon}</div>
+      <div style="flex:1"><div style="font-size:12px;font-weight:700">${esc(b.name)}</div><div style="font-family:var(--fm);font-size:7px;color:var(--text3);letter-spacing:.06em">${esc(b.type)}</div></div>
+      <span class="tag ${b.phase==='Live'?'live':b.phase==='Building'?'build':'dev'}">${b.phase.toUpperCase()}</span>
+    </div>`).join('');
+  document.getElementById('dash-trends').innerHTML=S.trends.slice(0,4).map(t=>`
+    <div class="tr2"><div class="tc">${t.cat}</div>
+    <div class="tbw"><div class="tbar" style="width:${t.score}%"></div></div>
+    <div class="tp3">${t.score}%</div><div class="ttg">${t.tag}</div></div>`).join('');
+  renderRevenueChart();
+}
+
+function renderRevenueChart(){
+  const byDate={};S.revenues.forEach(r=>{byDate[r.date]=(byDate[r.date]||0)+Number(r.amount);});
+  const dates=Object.keys(byDate).sort().slice(-6);
+  if(!dates.length){document.getElementById('dash-chart').innerHTML='<div style="color:var(--text3);font-size:10px;font-family:var(--fm)">NO REVENUE DATA YET</div>';document.getElementById('chart-labels').innerHTML='';document.getElementById('chart-total').textContent='R0';return;}
+  const vals=dates.map(d=>byDate[d]);const mx=Math.max(...vals);const total=vals.reduce((a,b)=>a+b,0);
+  document.getElementById('chart-total').textContent='R'+total.toLocaleString();
+  document.getElementById('dash-chart').innerHTML=vals.map((v,i)=>`<div class="cb ${i===vals.length-1?'hi':''}" style="height:${mx>0?Math.round(v/mx*100):4}%" title="R${v.toLocaleString()}"></div>`).join('');
+  document.getElementById('chart-labels').innerHTML=dates.map(d=>`<span>${d.slice(5)}</span>`).join('');
+}
+
+// ── REVENUE ───────────────────────────────────────────────────
+async function logRevenueModal(){
+  const amt=parseFloat(document.getElementById('nr-amount').value);
+  const src=document.getElementById('nr-src').value;
+  const note=document.getElementById('nr-note').value.trim();
+  if(!amt||amt<=0){notify('Enter valid amount','err');return;}
+  const{data,error}=await sb.from('revenue_logs').insert({user_id:S.user.id,amount:amt,source:src,note,logged_date:today()}).select().single();
+  if(error){notify('Error: '+error.message,'err');return;}
+  S.revenues.unshift(fromDB.revenue(data));closeModal('addRev');
+  document.getElementById('nr-amount').value='';document.getElementById('nr-note').value='';
+  if(document.getElementById('view-finance').classList.contains('active'))renderFinance();
+  notify('✅ Revenue logged — R'+amt.toLocaleString());
+}
+
+// ── TASKS ─────────────────────────────────────────────────────
+function renderTasks(){
+  const active=S.tasks.filter(t=>!t.done);const done=S.tasks.filter(t=>t.done);
+  const pc={high:'var(--red)',medium:'var(--gold)',low:'var(--text3)'};
+  const html=list=>list.map(t=>`
+    <div class="ti ${t.done?'done':''}" onclick="toggleTask('${t.id}')">
+      <div class="tk">${t.done?'✓':''}</div>
+      <div class="tprio" style="background:${pc[t.prio]||'var(--text3)'}"></div>
+      <div class="ttext">${esc(t.text)}</div>
+      <div class="ttag">${t.tag}</div>
+      <button onclick="event.stopPropagation();deleteTask('${t.id}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;padding:0 3px">×</button>
+    </div>`).join('')||'<div style="color:var(--text3);font-size:10px;padding:8px;font-family:var(--fm)">NONE</div>';
+  document.getElementById('tasks-active').innerHTML=html(active);
+  document.getElementById('tasks-done').innerHTML=html(done);
+  updateBadges();
+}
+async function toggleTask(id){const t=S.tasks.find(x=>String(x.id)===String(id));if(!t)return;const{error}=await sb.from('tasks').update({done:!t.done}).eq('id',id);if(error){notify('Error: '+error.message,'err');return;}t.done=!t.done;updateBadges();renderTasks();if(document.getElementById('view-dashboard').classList.contains('active'))renderDashboard();}
+async function deleteTask(id){const{error}=await sb.from('tasks').delete().eq('id',id);if(error){notify('Error: '+error.message,'err');return;}S.tasks=S.tasks.filter(t=>String(t.id)!==String(id));updateBadges();renderTasks();}
+async function addTask(){const text=document.getElementById('nt-text').value.trim();if(!text){notify('Enter task description','err');return;}const{data,error}=await sb.from('tasks').insert({user_id:S.user.id,text,tag:document.getElementById('nt-tag').value,priority:document.getElementById('nt-prio').value,done:false}).select().single();if(error){notify('Error: '+error.message,'err');return;}S.tasks.push(fromDB.task(data));closeModal('addTask');document.getElementById('nt-text').value='';updateBadges();if(document.getElementById('view-tasks').classList.contains('active'))renderTasks();notify('✅ Task added');}
+
+// ── BUSINESSES ────────────────────────────────────────────────
+function renderBiz(){
+  document.getElementById('biz-grid').innerHTML=S.businesses.map(b=>{
+    const pct=b.revenue>0?Math.min(100,Math.round(b.revenue/b.target*100)):0;
+    return`<div class="bc"><div class="cr tl"></div><div class="cr tr"></div>
+      <div class="bh">
+        <div class="bi">${b.icon}</div>
+        <div style="flex:1"><div class="bn">${esc(b.name)}</div><div class="bt">${esc(b.type)}</div></div>
+        <span class="tag ${b.phase==='Live'?'live':b.phase==='Building'?'build':'dev'}">${b.phase.toUpperCase()}</span>
+      </div>
+      <div class="bstats">
+        <div><div class="bs-lbl">MONTHLY REV</div><div class="bs-val" style="color:var(--gold)">R${Number(b.revenue).toLocaleString()}</div></div>
+        <div><div class="bs-lbl">TARGET</div><div class="bs-val">R${Number(b.target).toLocaleString()}</div></div>
+      </div>
+      <div class="prog-row"><span style="font-family:var(--fm);font-size:7px;color:var(--text3)">PROGRESS</span><span style="font-family:var(--fm);font-size:7px;color:var(--gold)">${pct}%</span></div>
+      <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+      <div class="btn-row" style="margin-top:11px">
+        <button class="btn" style="flex:1" onclick="editBizRevenue('${b.id}')">UPDATE REV</button>
+        <button class="btn danger" onclick="deleteBiz('${b.id}')">REMOVE</button>
+      </div>
+    </div>`;}).join('');
+}
+async function editBizRevenue(id){const b=S.businesses.find(x=>String(x.id)===String(id));if(!b)return;const val=prompt('Update monthly revenue for '+b.name+' (R):',b.revenue);if(val===null)return;const n=parseFloat(val);if(isNaN(n)||n<0){notify('Invalid amount','err');return;}const{error}=await sb.from('businesses').update({revenue:n}).eq('id',id);if(error){notify('Error: '+error.message,'err');return;}b.revenue=n;renderBiz();notify('✅ Revenue updated');}
+async function deleteBiz(id){if(!confirm('Remove this business?'))return;const{error}=await sb.from('businesses').delete().eq('id',id);if(error){notify('Error: '+error.message,'err');return;}S.businesses=S.businesses.filter(b=>String(b.id)!==String(id));renderBiz();}
+async function addBusiness(){const name=document.getElementById('nb-name').value.trim();if(!name){notify('Enter business name','err');return;}const{data,error}=await sb.from('businesses').insert({user_id:S.user.id,name,type:document.getElementById('nb-type').value||'Business',phase:document.getElementById('nb-phase').value,icon:document.getElementById('nb-icon').value||'🏢',revenue:parseFloat(document.getElementById('nb-rev').value)||0,target:parseFloat(document.getElementById('nb-target').value)||10000,color:'rgba(201,168,76,.08)'}).select().single();if(error){notify('Error: '+error.message,'err');return;}S.businesses.push(fromDB.business(data));closeModal('addBiz');renderBiz();notify('✅ Business added');}
+
+// ── AGENTS ────────────────────────────────────────────────────
+function renderAgents(){
+  const agents=[
+    {name:'Trend Agent',role:'Research · Daily scans',icon:'📡',tasks:['Monitors Pinterest categories','Pattern recognition on images','Logs trends to database','Alerts on viral content'],status:'Running'},
+    {name:'Content Agent',role:'Creative · Auto-publish',icon:'✍️',tasks:['Generates pins, posts, blogs','Creates copy from trend data','Schedules content pipeline','A/B tests headlines'],status:'Running'},
+    {name:'Analytics Agent',role:'Data · ROI tracking',icon:'📊',tasks:['Traffic + conversion metrics','Revenue attribution','Weekly performance report','Identifies top performers'],status:'Running'},
+    {name:'Research Agent',role:'Intel · Competitor watch',icon:'🔍',tasks:['Competitor analysis weekly','Industry opportunities scan','Feeds Knowledge Vault','Market sizing reports'],status:'Idle'},
+    {name:'Sales Agent',role:'Revenue · Outreach',icon:'💼',tasks:['Lead generation automation','Outreach sequences','Follow-up scheduling','Conversion optimization'],status:'Idle'},
+    {name:'Brain Agent',role:'Knowledge · Memory',icon:'🧠',tasks:['Curates knowledge vault','Synthesizes business lessons','Decision support layer','Connects patterns across data'],status:'Running'}
+  ];
+  document.getElementById('agents-grid').innerHTML=agents.map(a=>`
+    <div class="ac"><div class="ah"><div style="font-size:20px">${a.icon}</div>
+    <div><div class="an">${a.name}</div><div class="ar">${a.role}</div></div></div>
+    <div class="as2"><div class="sdot ${a.status==='Running'?'g':''}"></div>
+    <span style="color:${a.status==='Running'?'var(--green)':'var(--text3)'};font-family:var(--fm);font-size:8px;letter-spacing:.1em">${a.status.toUpperCase()}</span></div>
+    <div class="atl">${a.tasks.map(t=>`<div class="ati">${t}</div>`).join('')}</div>
+    <button class="arb" onclick="runAgent('${a.name}')">▶ RUN AGENT</button></div>`).join('');
+}
+const AGENT_PROMPTS={'Trend Agent':'You are Atlas Trend Agent. Analyze Pinterest and social media trends for fashion, streetwear, fragrance, luxury accessories. Give top 5 trending topics with specific content angles for my South African business portfolio.','Content Agent':'You are Atlas Content Agent. Generate a full content schedule: 3 Pinterest pins, 2 Instagram posts, 1 X post, 1 blog title. Cover ThriftVerse, Atlas Noir luxury belts, fragrance brand. Give exact copy ready to post.','Analytics Agent':'You are Atlas Analytics Agent. Give a concise business performance report: what channels are working, what to cut, and 3 high-impact actions this week to grow revenue.','Research Agent':'You are Atlas Research Agent. Research the luxury streetwear accessories market in South Africa. Give: top 3 competitors, market size estimate, 3 unmet needs, 2 Atlas Noir positioning angles.','Sales Agent':'You are Atlas Sales Agent. Create a 3-step outreach sequence for potential Atlas Noir luxury belt stockists. Include subject lines, full copy, and follow-up timing.','Brain Agent':'You are Atlas Brain Agent. Businesses: ThriftVerse, Atlas Noir, Fragrance Brand, Affiliate Engine. Give top 5 strategic insights that should guide this month.'};
+function runAgent(name){notify('◉ '+name+' running...');nav('ai');setTimeout(()=>callAI(AGENT_PROMPTS[name]||'Run '+name+' and report findings.'),200);}
+
+// ── TRENDS ────────────────────────────────────────────────────
+function renderTrends(){
+  document.getElementById('trend-bars').innerHTML=S.trends.map(t=>`
+    <div class="tr2"><div class="tc">${t.cat}</div>
+    <div class="tbw"><div class="tbar" style="width:${t.score}%"></div></div>
+    <div class="tp3">${t.score}%</div><div class="ttg">${t.tag}</div></div>`).join('');
+  document.getElementById('trend-opps').innerHTML=[
+    {icon:'◈',title:'Belt + Oversized Blazer',desc:'Fashion at high heat — perfect Atlas Noir angle. Post styling content now.',action:'CREATE PIN'},
+    {icon:'◆',title:'Fragrance Layering',desc:'Rising on Pinterest. Affiliate review with high purchase intent.',action:'WRITE BLOG'},
+    {icon:'◇',title:'Pre-loved Luxury',desc:'ThriftVerse niche overlaps luxury trend. Create content this week.',action:'LIST PRODUCTS'}
+  ].map(o=>`<div style="border:1px solid var(--border2);padding:13px;margin-bottom:7px">
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px"><span style="color:var(--gold)">${o.icon}</span><div style="font-size:12px;font-weight:700">${o.title}</div></div>
+    <div style="font-size:10px;color:var(--text2);line-height:1.6;margin-bottom:9px">${o.desc}</div>
+    <button class="cbtn ap" onclick="qc('Help me create content for: ${o.title} in my Atlas business portfolio')">${o.action} ↗</button></div>`).join('');
+}
+async function runScan(){notify('◉ AI scanning trends...');await callAIForTrends();}
+
+// ── CONTENT ───────────────────────────────────────────────────
+function renderContent(){
+  document.getElementById('content-queue').innerHTML=S.contentQueue.map((c,i)=>`
+    <div class="ci2">
+      <div class="cih"><span class="tag build" style="font-size:7px;padding:1px 6px">${c.type}</span><span style="font-family:var(--fm);font-size:7px;color:var(--text3)">${c.biz}</span>
+      <span class="tag ${c.status==='Scheduled'?'live':'dev'}" style="margin-left:auto;font-size:7px">${c.status.toUpperCase()}</span></div>
+      <div class="cib">${esc(c.text)}</div>
+      <div class="cia">
+        <button class="cbtn ap" onclick="approveContent('${c.id}')">✓ APPROVE</button>
+        <button class="cbtn" onclick="copyContent(${i})">COPY</button>
+        <button class="cbtn" style="color:var(--red)" onclick="deleteContent('${c.id}')">DELETE</button>
+      </div>
+    </div>`).join('')||'<div style="color:var(--text3);font-size:10px;padding:8px;font-family:var(--fm)">NO CONTENT YET — GENERATE ABOVE</div>';
+}
+async function genContent(){
+  const type=document.getElementById('ct-type').value;const biz=document.getElementById('ct-biz').value;const topic=document.getElementById('ct-topic').value.trim()||'new product drop';
+  notify('⚡ Generating content...');
+  try{const token=await getToken();if(!token)throw new Error('Not authenticated');
+    const resp=await fetch(GATEWAY_URL,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:'Generate one '+type+' for '+biz+' about: '+topic+'. Premium, aspirational South African market style. Return ONLY the post copy, no intro or labels.'}]})});
+    const result=await resp.json();if(!result.reply)throw new Error('No reply');
+    const{data,error}=await sb.from('content_queue').insert({user_id:S.user.id,type,business:biz,body:result.reply,status:'Draft'}).select().single();
+    if(error)throw error;S.contentQueue.unshift(fromDB.content(data));renderContent();notify('✅ Content generated');
+  }catch(e){notify('❌ '+e.message,'err');}
+}
+async function approveContent(id){const{error}=await sb.from('content_queue').update({status:'Scheduled'}).eq('id',id);if(error){notify('Error: '+error.message,'err');return;}const c=S.contentQueue.find(x=>String(x.id)===String(id));if(c)c.status='Scheduled';renderContent();notify('✅ Approved');}
+function copyContent(i){if(!S.contentQueue[i])return;navigator.clipboard.writeText(S.contentQueue[i].text).then(()=>notify('📋 Copied')).catch(()=>notify('Copy failed'));}
+async function deleteContent(id){const{error}=await sb.from('content_queue').update({deleted_at:new Date().toISOString()}).eq('id',id);if(error){notify('Error: '+error.message,'err');return;}S.contentQueue=S.contentQueue.filter(c=>String(c.id)!==String(id));renderContent();}
+
+// ── DATABASE ──────────────────────────────────────────────────
+function switchDB(view,btn){S.dbView=view;document.querySelectorAll('#db-tabs .btn').forEach(b=>{b.style.borderColor='';b.style.color='';});if(btn){btn.style.borderColor='rgba(201,168,76,.3)';btn.style.color='var(--gold)';}renderDB();}
+function renderDB(){
+  const views={products:{headers:['BUSINESS','PHASE','MONTHLY REV','TARGET','PROGRESS'],rows:S.businesses.map(b=>[b.name,b.phase,'R'+Number(b.revenue).toLocaleString(),'R'+Number(b.target).toLocaleString(),Math.round(b.revenue/b.target*100)+'%'])},content:{headers:['CONTENT','TYPE','BUSINESS','STATUS'],rows:S.contentQueue.slice(0,10).map(c=>[c.text.substring(0,40)+'…',c.type,c.biz,c.status])},affiliate:{headers:['PRODUCT','PLATFORM','COMM%','CONV%','STATUS'],rows:S.affiliates.map(a=>[a.name,a.platform,a.comm+'%',a.conv+'%',a.status])},kpis:{headers:['SOURCE','AMOUNT','NOTE','DATE'],rows:S.revenues.slice(0,10).map(r=>[r.src,'R'+Number(r.amount).toLocaleString(),r.note||'—',r.date||today()])}};
+  const view=views[S.dbView]||views.products;
+  document.getElementById('db-content').innerHTML=`<table class="dbt"><thead><tr>${view.headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${view.rows.map(row=>`<tr>${row.map((cell,i)=>`<td class="${i===0?'dcn':''}">${esc(String(cell))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+// ── KNOWLEDGE ─────────────────────────────────────────────────
+function renderKnowledge(){
+  const cats=['Business','Marketing','Psychology','Technology','Creativity','Finance'];
+  document.getElementById('know-cats').innerHTML=cats.map(c=>{const count=S.knowledge.filter(k=>k.cat===c).length;return`<div style="padding:7px 0;border-bottom:1px solid var(--border2);cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="filterKnow('${c}')"><span style="font-size:11px;font-weight:600">${c}</span><span style="font-family:var(--fm);font-size:7px;color:var(--text3)">${count}</span></div>`;}).join('');
+  renderKnowEntries(S.knowledge);
+}
+function filterKnow(cat){renderKnowEntries(S.knowledge.filter(k=>k.cat===cat));}
+function renderKnowEntries(list){document.getElementById('know-entries').innerHTML=list.map(k=>`<div class="ki"><div class="ktt">${esc(k.title)}</div><div class="ke">${esc(k.content.substring(0,120))}…</div><div class="km"><span class="ktg">${k.cat}</span>${(k.tags||[]).map(t=>`<span class="ktg">${t}</span>`).join('')}<button onclick="deleteKnow('${k.id}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:10px;margin-left:auto;font-family:var(--fm)">× REMOVE</button></div></div>`).join('')||'<div style="color:var(--text3);font-size:10px;padding:8px;font-family:var(--fm)">NO ENTRIES</div>';}
+async function addKnowledge(){const title=document.getElementById('nk-title').value.trim();const content=document.getElementById('nk-content').value.trim();if(!title||!content){notify('Fill in title and content','err');return;}const{data,error}=await sb.from('knowledge').insert({user_id:S.user.id,title,category:document.getElementById('nk-cat').value,content,tags:[]}).select().single();if(error){notify('Error: '+error.message,'err');return;}S.knowledge.unshift(fromDB.knowledge(data));closeModal('addKnowledge');document.getElementById('nk-title').value='';document.getElementById('nk-content').value='';renderKnowledge();notify('✅ Saved to vault');}
+async function deleteKnow(id){const{error}=await sb.from('knowledge').delete().eq('id',id);if(error){notify('Error: '+error.message,'err');return;}S.knowledge=S.knowledge.filter(k=>String(k.id)!==String(id));renderKnowledge();}
+
+// ── FINANCE ───────────────────────────────────────────────────
+function renderFinance(){
+  const totalRev=S.revenues.reduce((a,r)=>a+Number(r.amount),0);const totalExp=S.expenses.reduce((a,e)=>a+Number(e.amount),0);
+  document.getElementById('fin-total').textContent='R'+totalRev.toLocaleString();
+  document.getElementById('fin-exp').textContent='R'+totalExp.toLocaleString();
+  document.getElementById('fin-net').textContent='R'+Math.max(0,totalRev-totalExp).toLocaleString();
+  document.getElementById('fin-entries').textContent=S.revenues.length;
+  document.getElementById('fin-logs').innerHTML=S.revenues.map(r=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2)"><div style="flex:1"><div style="font-size:11px">${esc(r.src)}</div>${r.note?`<div style="font-size:9px;color:var(--text3);font-family:var(--fm)">${esc(r.note)}</div>`:''}</div><div style="font-family:var(--fm);font-size:8px;color:var(--text3)">${r.date}</div><div style="font-family:var(--fm);font-size:11px;color:var(--green)">+R${Number(r.amount).toLocaleString()}</div><button onclick="deleteRevenue('${r.id}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px">×</button></div>`).join('')||'<div style="color:var(--text3);font-size:10px;padding:8px;font-family:var(--fm)">NO REVENUE YET</div>';
+  document.getElementById('fin-expenses').innerHTML=S.expenses.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2)"><div style="flex:1"><div style="font-size:11px">${esc(e.desc)}</div><div style="font-family:var(--fm);font-size:8px;color:var(--text3)">${e.cat}</div></div><div style="font-family:var(--fm);font-size:8px;color:var(--text3)">${e.date||''}</div><div style="font-family:var(--fm);font-size:11px;color:var(--red)">-R${Number(e.amount).toLocaleString()}</div><button onclick="deleteExpense('${e.id}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px">×</button></div>`).join('')||'<div style="color:var(--text3);font-size:10px;padding:8px;font-family:var(--fm)">NO EXPENSES YET</div>';
+}
+async function deleteRevenue(id){const{error}=await sb.from('revenue_logs').delete().eq('id',id);if(error){notify('Error: '+error.message,'err');return;}S.revenues=S.revenues.filter(r=>String(r.id)!==String(id));renderFinance();}
+async function addExpense(){const desc=document.getElementById('ne-desc').value.trim();const amount=parseFloat(document.getElementById('ne-amount').value);if(!desc||!amount||amount<=0){notify('Fill in description and amount','err');return;}const{data,error}=await sb.from('expenses').insert({user_id:S.user.id,description:desc,amount,category:document.getElementById('ne-cat').value,expense_date:today()}).select().single();if(error){notify('Error: '+error.message,'err');return;}S.expenses.unshift(fromDB.expense(data));closeModal('addExpense');document.getElementById('ne-desc').value='';document.getElementById('ne-amount').value='';if(document.getElementById('view-finance').classList.contains('active'))renderFinance();notify('✅ Expense logged');}
+async function deleteExpense(id){const{error}=await sb.from('expenses').delete().eq('id',id);if(error){notify('Error: '+error.message,'err');return;}S.expenses=S.expenses.filter(e=>String(e.id)!==String(id));renderFinance();}
+
+// ── AFFILIATE ─────────────────────────────────────────────────
+function renderAffiliate(){
+  document.getElementById('aff-body').innerHTML=S.affiliates.map(a=>`<tr><td class="dcn">${esc(a.name)}</td><td><span class="badge">${a.platform}</span></td><td style="font-family:var(--fm);font-size:9px;color:var(--blue)">${a.url==='#'?'—':esc(a.url.substring(0,28))}</td><td class="dcm">${a.conv}%</td><td class="dcm" style="color:var(--green)">${a.comm}%</td><td><span class="tag ${a.status==='Active'?'live':'dev'}">${a.status.toUpperCase()}</span></td><td><button onclick="deleteAffiliate('${a.id}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px">×</button></td></tr>`).join('')||'<tr><td colspan="7" style="color:var(--text3);text-align:center;padding:14px;font-family:var(--fm);font-size:9px">NO LINKS YET</td></tr>';
+}
+async function addAffiliate(){const name=document.getElementById('na-name').value.trim();if(!name){notify('Enter product name','err');return;}const{data,error}=await sb.from('affiliate_links').insert({user_id:S.user.id,name,platform:document.getElementById('na-platform').value,url:document.getElementById('na-url').value.trim()||'#',conversion_pct:parseFloat(document.getElementById('na-conv').value)||0,commission_pct:parseFloat(document.getElementById('na-comm').value)||0,status:'Active'}).select().single();if(error){notify('Error: '+error.message,'err');return;}S.affiliates.push(fromDB.affiliate(data));closeModal('addAffiliate');['na-name','na-url','na-conv','na-comm'].forEach(id=>document.getElementById(id).value='');renderAffiliate();notify('✅ Affiliate link added');}
+async function deleteAffiliate(id){const{error}=await sb.from('affiliate_links').delete().eq('id',id);if(error){notify('Error: '+error.message,'err');return;}S.affiliates=S.affiliates.filter(a=>String(a.id)!==String(id));renderAffiliate();}
+
+// ── ROADMAP ───────────────────────────────────────────────────
+function renderRoadmap(){
+  const phases=[
+    {num:'01',title:'Foundation',range:'0–30 Days',active:true,progress:85,items:['Supabase backend','AI Gateway (Groq)','Security hardening','Frontend connected'],done:[0,1,2,3]},
+    {num:'02',title:'Guardian',range:'30–60 Days',active:true,progress:75,items:['Health monitoring','GitHub backup','Alert system','Guardian panel'],done:[0,1,2]},
+    {num:'03',title:'Scale',range:'3–12 Months',active:false,progress:10,items:['Agent Registry','Knowledge Engine','Pinterest engine','Multi-stream income'],done:[]},
+    {num:'04',title:'Atlas OS',range:'1–3 Years',active:false,progress:0,items:['100+ AI agents','Local LLMs','All businesses on Atlas','Autonomous operations'],done:[]}
+  ];
+  document.getElementById('roadmap-grid').innerHTML=phases.map(p=>`
+    <div class="pc ${p.active?'active':''}">
+      ${p.active?'<div style="font-family:var(--fm);font-size:7px;color:var(--gold);letter-spacing:.18em;margin-bottom:5px">● ACTIVE PHASE</div>':''}
+      <div class="pnum">PHASE ${p.num}</div><div class="ptit">${p.title}</div><div class="prng">${p.range}</div>
+      <div style="margin-bottom:11px">${p.items.map((item,i)=>`<div class="pit ${p.done.includes(i)?'done':''}">${item}</div>`).join('')}</div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--fm);font-size:7px;color:var(--text3);margin-bottom:4px"><span>PROGRESS</span><span style="color:var(--gold)">${p.progress}%</span></div>
+      <div class="prog-bar"><div class="prog-fill" style="width:${p.progress}%"></div></div>
+    </div>`).join('');
+}
+
+// ── GUARDIAN ──────────────────────────────────────────────────
+async function loadGuardianData(){
+  try{
+    const[reportRes,alertRes,manifestRes]=await Promise.all([
+      sb.from('guardian_reports').select('*').order('report_date',{ascending:false}).limit(1).single(),
+      sb.from('guardian_alerts').select('*').eq('status','active').order('created_at',{ascending:false}).limit(10),
+      sb.from('guardian_manifests').select('*').order('backup_date',{ascending:false}).limit(5)
+    ]);
+    if(reportRes.data){GD.score=reportRes.data.guardian_score;GD.status=reportRes.data.status;}
+    GD.alerts=alertRes.data||[];GD.manifests=manifestRes.data||[];
+    updateGuardianSidebar();
+    if(document.getElementById('view-guardian').classList.contains('active'))renderGuardian();
+  }catch(e){console.log('Guardian data:',e.message);}
+}
+
+function updateGuardianSidebar(){
+  if(GD.score===null)return;
+  document.getElementById('sb-gscore').textContent=GD.score;
+  document.getElementById('sb-gfill').style.width=GD.score+'%';
+  const status=GD.score>=90?'HEALTHY':GD.score>=70?'WARNING':'CRITICAL';
+  const color=GD.score>=90?'var(--green)':GD.score>=70?'var(--gold)':'var(--red)';
+  document.getElementById('sb-gstatus').textContent=status;
+  document.getElementById('sb-gstatus').style.color=color;
+  updateRing(GD.score,status,color);
+}
+
+function updateRing(score,status,color){
+  const arc=document.getElementById('g-arc');
+  const scoreEl=document.getElementById('g-ring-score');
+  const statusEl=document.getElementById('g-ring-status');
+  if(!arc||!scoreEl||!statusEl)return;
+  const offset=390-(390*score/100);
+  arc.style.strokeDashoffset=offset;
+  arc.style.stroke=color||'var(--gold)';
+  scoreEl.textContent=score;
+  scoreEl.setAttribute('fill',color||'#c9a84c');
+  statusEl.textContent=status||'LOADING';
+}
+
+function renderGuardian(){
+  const score=GD.score;
+  const status=score===null?'LOADING':score>=90?'HEALTHY':score>=70?'WARNING':'CRITICAL';
+  const color=score===null?'var(--text3)':score>=90?'var(--green)':score>=70?'var(--gold)':'var(--red)';
+  updateRing(score||0,status,color);
+  const manifest=GD.manifests[0];
+  const ageH=manifest?.completed_at?Math.round((Date.now()-new Date(manifest.completed_at).getTime())/3600000):null;
+  document.getElementById('g-stats-grid').innerHTML=[
+    {label:'TABLES BACKED',value:manifest?manifest.total_rows?.toLocaleString()||'—':'—'},
+    {label:'BACKUP AGE',value:ageH!==null?(ageH<1?'<1h':ageH+'h'):'NEVER'},
+    {label:'ACTIVE ALERTS',value:GD.alerts.length}
+  ].map(s=>`<div class="g-stat"><div class="g-stat-v" style="${s.label==='ACTIVE ALERTS'&&s.value>0?'color:var(--red)':''}">${s.value}</div><div class="g-stat-l">${s.label}</div></div>`).join('');
+  document.getElementById('g-backup-list').innerHTML=GD.manifests.length?GD.manifests.map(m=>`
+    <div class="g-backup-item">
+      <div class="g-backup-date">${m.backup_date}</div>
+      <div class="g-backup-rows">${(m.total_rows||0).toLocaleString()} rows · ${Math.round((m.file_size_bytes||0)/1024)}KB</div>
+      <span class="tag ${m.status==='completed'?'live':'crit'}" style="font-size:7px">${m.status.toUpperCase()}</span>
+    </div>`).join(''):'<div style="color:var(--text3);font-size:10px;padding:8px;font-family:var(--fm)">NO BACKUPS YET</div>';
+  if(manifest?.github_url)document.getElementById('g-gh-link').href=manifest.github_url;
+  document.getElementById('g-alerts-list').innerHTML=GD.alerts.length?GD.alerts.map(a=>`
+    <div class="g-alert-item">
+      <div class="sdot ${a.severity==='critical'?'r':'a'}" style="margin-top:4px"></div>
+      <div><div class="g-alert-msg">${esc(a.message)}</div><div class="g-alert-type">${a.alert_type}</div></div>
+      <span class="tag ${a.severity==='critical'?'crit':'warn'}" style="font-size:7px;flex-shrink:0">${a.severity.toUpperCase()}</span>
+    </div>`).join(''):'<div style="color:var(--green);font-size:10px;padding:8px;font-family:var(--fm);display:flex;align-items:center;gap:7px"><div class="sdot g"></div>NO ACTIVE ALERTS</div>';
+}
+
+async function runGuardianScan(){
+  notify('◉ Running health scan...');
+  try{const token=await getToken();if(!token)throw new Error('Not authenticated');
+    const resp=await fetch(GUARDIAN_HEALTH_URL,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:'{}'});
+    const data=await resp.json();
+    if(data.success){GD.score=data.guardian_score;GD.status=data.status;updateGuardianSidebar();await loadGuardianData();notify('✅ Health scan complete — Score: '+data.guardian_score+'/100');}
+    else throw new Error(data.error||'Scan failed');
+  }catch(e){notify('❌ '+e.message,'err');}
+}
+
+async function runGuardianBackup(){
+  notify('↑ Running backup...');
+  try{const token=await getToken();if(!token)throw new Error('Not authenticated');
+    const resp=await fetch(GUARDIAN_BACKUP_URL,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:'{}'});
+    const data=await resp.json();
+    if(data.success){await loadGuardianData();notify('✅ Backup complete — '+data.tables_backed+' tables, '+data.total_rows+' rows');}
+    else throw new Error(data.error||'Backup failed');
+  }catch(e){notify('❌ '+e.message,'err');}
+}
+
+// ── AI COMMAND ────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{const inp=document.getElementById('ci');if(inp&&document.activeElement===inp&&e.key==='Enter')sendCmd();});
+async function sendCmd(){const inp=document.getElementById('ci');const text=inp.value.trim();if(!text)return;inp.value='';await callAI(text);}
+function qc(text){nav('ai');setTimeout(()=>callAI(text),120);}
+
+async function callAI(userMsg){
+  const cm=document.getElementById('cm');if(!cm)return;
+  cm.innerHTML+=`<div class="msg"><div class="mr">OPERATOR</div><div class="mc2">${esc(userMsg)}</div></div>`;
+  const tid='tp-'+Date.now();
+  cm.innerHTML+=`<div class="msg" id="${tid}"><div class="mr ai">ATLAS</div><div class="mc2 tp"><span></span><span></span><span></span></div></div>`;
+  cm.scrollTop=cm.scrollHeight;
+  S.chatHistory.push({role:'user',content:userMsg});
+  if(S.chatHistory.length>20)S.chatHistory=S.chatHistory.slice(-20);
+  try{
+    const token=await getToken();if(!token)throw new Error('Session expired. Please refresh.');
+    const resp=await fetch(GATEWAY_URL,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({messages:S.chatHistory})});
+    if(!resp.ok){const err=await resp.json().catch(()=>({}));throw new Error(err.error||'Gateway error '+resp.status);}
+    const data=await resp.json();const reply=data.reply||'';
+    S.chatHistory.push({role:'assistant',content:reply});
+    const el=document.getElementById(tid);
+    if(el)el.outerHTML=`<div class="msg"><div class="mr ai">ATLAS</div><div class="mc2">${fmtAI(reply)}</div></div>`;
+  }catch(e){const el=document.getElementById(tid);if(el)el.outerHTML=`<div class="msg"><div class="mr ai">ATLAS</div><div class="mc2" style="color:var(--red);font-family:var(--fm);font-size:10px">${esc(e.message)}</div></div>`;}
+  cm.scrollTop=cm.scrollHeight;
+}
+
+async function callAIForTrends(){
+  try{const token=await getToken();if(!token)return;
+    const resp=await fetch(GATEWAY_URL,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:'Analyze current Pinterest trends for fashion, streetwear, fragrance, luxury, AI. Give 6 categories with heat score 0-100 and tag. JSON only: [{"cat":string,"score":number,"tag":string}]'}]})});
+    const data=await resp.json();
+    try{const parsed=JSON.parse(data.reply.replace(/```json|```/g,'').trim());
+      if(Array.isArray(parsed)){S.trends=parsed.map(t=>({cat:String(t.cat||'').toUpperCase(),score:Math.min(100,Math.max(0,Number(t.score||50))),tag:t.tag||'📊 STABLE'}));
+        await sb.from('trends').insert(S.trends.map(t=>({user_id:S.user?.id,category:t.cat,score:t.score,tag:t.tag,source:'AI Scan'})));renderTrends();notify('✅ Trends updated');}
+    }catch{renderTrends();notify('✅ Trends refreshed');}
+  }catch(e){notify('Scan failed: '+e.message,'err');}
+}
+
+function fmtAI(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n\n/g,'</p><p style="margin-top:8px">').replace(/\n/g,'<br>').replace(/^/,'<p>').replace(/$/,'</p>');}
+
+// ── MODALS ────────────────────────────────────────────────────
+function openModal(id){const el=document.getElementById('modal-'+id);if(el)el.classList.add('open');}
+function closeModal(id){const el=document.getElementById('modal-'+id);if(el)el.classList.remove('open');}
+document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+
+// ── HELPERS ───────────────────────────────────────────────────
+function updateBadges(){const active=S.tasks.filter(t=>!t.done).length;const el=document.getElementById('tkbadge');if(el)el.textContent=active;const el2=document.getElementById('tkcb');if(el2)el2.textContent=active;}
+let notifTimer=null;
+function notify(msg,type){const n=document.getElementById('notif');n.textContent=msg;n.style.borderColor=type==='err'?'rgba(224,82,82,.4)':'var(--border)';n.style.display='block';clearTimeout(notifTimer);notifTimer=setTimeout(()=>{n.style.display='none';},3500);}
+function clock(){const el=document.getElementById('clk');if(el){const now=new Date();el.textContent=now.toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+' · '+now.toLocaleDateString('en-ZA',{day:'numeric',month:'short'});}}
+setInterval(clock,1000);clock();
+function exportData(){const data={tasks:S.tasks,businesses:S.businesses,revenues:S.revenues,expenses:S.expenses,affiliates:S.affiliates,contentQueue:S.contentQueue,knowledge:S.knowledge,exportDate:new Date().toISOString()};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='atlas_backup_'+today()+'.json';a.click();URL.revokeObjectURL(url);notify('✅ Data exported');}
+function importData(){document.getElementById('importFile').click();}
+function doImport(event){notify('✅ Use Supabase dashboard to restore data');event.target.value='';}
+
+// ── INIT ──────────────────────────────────────────────────────
+checkSession();
+</script>
+</body>
+</html>
