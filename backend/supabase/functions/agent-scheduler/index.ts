@@ -253,7 +253,7 @@ serve(async (req: Request) => {
       const { data: limits, error: limitsErr } = await supabase.rpc("get_user_plan_limits", { p_user_id: userId });
       if (limitsErr) throw new Error(`get_user_plan_limits failed: ${limitsErr.message}`);
       if (!limits?.agents_enabled) {
-        await completeAgentTask(supabase,
+        await completeAgentTask(supabase, {
           p_task_id: taskId, p_status: "failed",
           p_error:   "Agents not available on current plan. Upgrade to Pro.",
         });
