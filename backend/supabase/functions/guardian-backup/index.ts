@@ -3,7 +3,7 @@
 // supabase/functions/guardian-backup/index.ts
 //
 // Runs nightly at 01:30 via pg_cron (30 min after health scan)
-// Exports all Atlas data to GitHub private repository
+// Exports the configured backup allowlist to the private GitHub repository; this is not a full database backup.
 // Records manifest with checksums in guardian_manifests
 //
 // v1.1: Added CORS headers — required for browser calls
@@ -15,6 +15,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL  = Deno.env.get("SUPABASE_URL")             ?? "";
 const SUPABASE_SVC  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SUPABASE_ANON = Deno.env.get("SUPABASE_ANON_KEY")          ?? "";
 const GITHUB_PAT    = Deno.env.get("GITHUB_PAT")               ?? "";
 const GITHUB_REPO   = Deno.env.get("GITHUB_REPO")              ?? "";
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "*")
@@ -32,6 +33,94 @@ function buildCorsHeaders(origin: string | null): Record<string, string> {
     "Access-Control-Max-Age":       "86400",
     "Vary":                         "Origin",
   };
+}
+
+async function authenticateRequest(req: Request): Promise<Response | null> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+
+  if (!authHeader.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Authentication required" }), {
+      status: 401,
+      headers: { ...buildCorsHeaders(req.headers.get("origin")), "Content-Type": "application/json" },
+    });
+  }
+
+  const credential = authHeader.slice("Bearer ".length).trim();
+
+  if (!credential) {
+    return new Response(JSON.stringify({ error: "Authentication required" }), {
+      status: 401,
+      headers: { ...buildCorsHeaders(req.headers.get("origin")), "Content-Type": "application/json" },
+    });
+  }
+
+  // Trusted machine-to-machine path: first accept an exact configured credential.
+  if (SUPABASE_SVC && credential === SUPABASE_SVC) {
+    return null;
+  }
+
+  // Also validate the cron credential against PostgREST privileges. This handles
+  // Supabase key rotation where Vault and the function's built-in key env can differ.
+  // guardian_operators has no anon/authenticated SELECT grants, so only service_role
+  // credentials can pass this capability check.
+  if (SUPABASE_URL && SUPABASE_ANON) {
+    const serviceVerifier = createClient(SUPABASE_URL, SUPABASE_ANON, {
+      global: { headers: { Authorization: `Bearer ${credential}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { error: serviceAccessError } = await serviceVerifier
+      .from("guardian_operators")
+      .select("user_id")
+      .limit(0);
+    if (!serviceAccessError) return null;
+  }
+
+  // Interactive user path: validate the supplied Atlas user JWT.
+  if (!SUPABASE_URL || !SUPABASE_ANON) {
+    return new Response(JSON.stringify({ error: "Authentication unavailable" }), {
+      status: 500,
+      headers: { ...buildCorsHeaders(req.headers.get("origin")), "Content-Type": "application/json" },
+    });
+  }
+
+  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON, {
+    global: {
+      headers: { Authorization: `Bearer ${credential}` },
+    },
+  });
+
+  const {
+    data: { user },
+    error: authErr,
+  } = await userClient.auth.getUser();
+
+  if (authErr || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...buildCorsHeaders(req.headers.get("origin")), "Content-Type": "application/json" },
+    });
+  }
+
+  // Guardian health/backup use service-role privileges; only explicitly enabled
+  // Guardian operators may invoke them with a user JWT. Cron remains service-key-only.
+  const operatorClient = createClient(SUPABASE_URL, SUPABASE_SVC, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: operator, error: operatorErr } = await operatorClient
+    .from("guardian_operators")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .eq("enabled", true)
+    .maybeSingle();
+
+  if (operatorErr || !operator) {
+    return new Response(JSON.stringify({ error: "Guardian operator access required" }), {
+      status: 403,
+      headers: { ...buildCorsHeaders(req.headers.get("origin")), "Content-Type": "application/json" },
+    });
+  }
+
+  return null;
 }
 
 const BACKUP_TABLES = [
@@ -150,9 +239,12 @@ serve(async (req: Request) => {
     });
   }
 
+  const authError = await authenticateRequest(req);
+  if (authError) return authError;
+
   const sb = createClient(SUPABASE_URL, SUPABASE_SVC);
 
-  const { data: manifest } = await sb
+  const { data: manifest, error: manifestInsertError } = await sb
     .from("guardian_manifests")
     .insert({
       backup_date:  today,
@@ -163,7 +255,15 @@ serve(async (req: Request) => {
     .select()
     .single();
 
-  const manifestId = manifest?.id ?? backupId;
+  if (manifestInsertError || !manifest?.id) {
+    const message = manifestInsertError?.message ?? "Manifest insert returned no row";
+    log("error", "manifest_insert_failed", { error: message });
+    return new Response(JSON.stringify({ success: false, error: "Could not create backup manifest" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
+  }
+
+  const manifestId = manifest.id;
 
   try {
     const tableResults: Array<{
@@ -186,11 +286,14 @@ serve(async (req: Request) => {
         const { data, error } = await sb
           .from(table)
           .select("*")
-          .limit(MAX_ROWS);
+          .limit(MAX_ROWS + 1);
 
         if (error) throw new Error(error.message);
 
-        const rows    = data ?? [];
+        const rows = data ?? [];
+        if (rows.length > MAX_ROWS) {
+          throw new Error(`Row cap exceeded for ${table}: more than ${MAX_ROWS} rows; pagination is required before this table can be backed up completely`);
+        }
         const content = JSON.stringify(rows, null, 2);
         const checksum = await sha256(content);
         const path     = `backups/${today}/tables/${table}.json`;
@@ -247,22 +350,24 @@ serve(async (req: Request) => {
 
     const manifestChecksum = await sha256(manifestContent);
 
-    await pushToGitHub(
+    const manifestPush = await pushToGitHub(
       `backups/${today}/manifest.json`,
       manifestContent,
       `Guardian backup ${today} — manifest`
     );
+    if (!manifestPush.success) throw new Error(`GitHub manifest upload failed: ${manifestPush.error ?? "unknown error"}`);
 
     const checksumLines = tableResults
       .filter(t => t.checksum)
       .map(t => `${t.checksum}  ${t.path}`)
       .join("\n");
 
-    await pushToGitHub(
+    const checksumsPush = await pushToGitHub(
       `backups/${today}/checksums.sha256`,
       checksumLines,
       `Guardian backup ${today} — checksums`
     );
+    if (!checksumsPush.success) throw new Error(`GitHub checksum file upload failed: ${checksumsPush.error ?? "unknown error"}`);
 
     const successCount = tableResults.filter(t => t.success).length;
     const failCount    = tableResults.filter(t => !t.success).length;
@@ -271,7 +376,8 @@ serve(async (req: Request) => {
       `# ATLAS Guardian Backup — ${today}`,
       ``,
       `## Summary`,
-      `- **Status:** ${allSuccess ? "✅ All tables backed up" : "⚠️ Some tables failed"}`,
+      `- **Status:** ${allSuccess ? "✅ All configured tables backed up" : "⚠️ Some tables failed"}`,
+      `- **Scope:** configured allowlist only (${BACKUP_TABLES.length} tables; not every public database table)`,
       `- **Tables:** ${successCount}/${BACKUP_TABLES.length} successful`,
       `- **Total rows:** ${totalRows.toLocaleString()}`,
       `- **Total size:** ${Math.round(totalSizeBytes / 1024)} KB`,
@@ -284,16 +390,17 @@ serve(async (req: Request) => {
       ),
     ].join("\n");
 
-    await pushToGitHub(
+    const summaryPush = await pushToGitHub(
       `backups/${today}/summary.md`,
       summaryLines,
       `Guardian backup ${today} — summary`
     );
+    if (!summaryPush.success) throw new Error(`GitHub summary upload failed: ${summaryPush.error ?? "unknown error"}`);
 
     const githubUrl = `https://github.com/${GITHUB_REPO}/tree/main/backups/${today}`;
     const durationMs = Date.now() - startMs;
 
-    await sb.from("guardian_manifests").update({
+    const { error: manifestUpdateError } = await sb.from("guardian_manifests").update({
       tables_backed:   tableResults,
       total_rows:      totalRows,
       file_size_bytes: totalSizeBytes,
@@ -302,12 +409,14 @@ serve(async (req: Request) => {
       github_url:      githubUrl,
       completed_at:    new Date().toISOString(),
     }).eq("id", manifestId);
+    if (manifestUpdateError) throw new Error(`guardian_manifests update failed: ${manifestUpdateError.message}`);
 
-    await sb.from("guardian_reports").update({
+    const { error: reportUpdateError } = await sb.from("guardian_reports").update({
       backup_status:   allSuccess ? "completed" : "failed",
       backup_location: githubUrl,
       updated_at:      new Date().toISOString(),
     }).eq("report_date", today);
+    if (reportUpdateError) throw new Error(`guardian_reports update failed: ${reportUpdateError.message}`);
 
     if (!allSuccess) {
       const failedTables = tableResults.filter(t => !t.success).map(t => t.name);
@@ -366,19 +475,21 @@ serve(async (req: Request) => {
     const msg = err instanceof Error ? err.message : String(err);
     log("error", "backup_failed", { error: msg });
 
-    await sb.from("guardian_manifests").update({
+    const { error: failureManifestUpdateError } = await sb.from("guardian_manifests").update({
       status:        "failed",
       error_message: msg,
       completed_at:  new Date().toISOString(),
     }).eq("id", manifestId);
+    if (failureManifestUpdateError) log("error", "failure_manifest_update_failed", { error: failureManifestUpdateError.message });
 
-    await sb.from("guardian_alerts").insert({
+    const { error: failureAlertError } = await sb.from("guardian_alerts").insert({
       alert_type: "backup.failed",
       severity:   "critical",
       message:    `Backup failed: ${msg}`,
       metadata:   { error: msg },
       status:     "active",
-    }).catch(() => {});
+    });
+    if (failureAlertError) log("error", "failure_alert_insert_failed", { error: failureAlertError.message });
 
     return new Response(JSON.stringify({ success: false, error: msg }), {
       status: 500,
