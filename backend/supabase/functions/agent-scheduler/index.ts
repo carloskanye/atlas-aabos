@@ -149,7 +149,7 @@ async function persistResults(
       source:   "Trend Agent (automated)",
     }));
     const { error } = await supabase.from("trends").insert(rows);
-    if (error) console.error("[agent-scheduler] trends insert failed:", error.message);
+    if (error) throw new Error(`trends insert failed: ${error.message}`);
   }
 
   // Content Agent → content_queue
@@ -163,7 +163,7 @@ async function persistResults(
       platform: String(item.type ?? "").toLowerCase().includes("pin") ? "Pinterest" : "Social",
     }));
     const { error } = await supabase.from("content_queue").insert(rows);
-    if (error) console.error("[agent-scheduler] content_queue insert failed:", error.message);
+    if (error) throw new Error(`content_queue insert failed: ${error.message}`);
   }
 
   // Research / Brain / Analytics → knowledge vault
@@ -177,8 +177,17 @@ async function persistResults(
       content:  `${summary}\n\nDetails:\n${JSON.stringify(insights, null, 2)}`,
       tags:     [agentName, "automated", new Date().toLocaleDateString("en-ZA")],
     });
-    if (error) console.error("[agent-scheduler] knowledge insert failed:", error.message);
+    if (error) throw new Error(`knowledge insert failed: ${error.message}`);
   }
+}
+
+// ── Checked task completion ──────────────────────────────────
+async function completeAgentTask(
+  supabase: ReturnType<typeof createClient>,
+  params: { p_task_id: string; p_status: string; p_output?: Record<string, unknown>; p_error?: string }
+): Promise<void> {
+  const { error } = await supabase.rpc("complete_agent_task", params);
+  if (error) throw new Error(`complete_agent_task failed: ${error.message}`);
 }
 
 // ── Main handler ─────────────────────────────────────────────
@@ -187,39 +196,64 @@ serve(async (req: Request) => {
     return new Response(null, { headers: { "Access-Control-Allow-Origin": ALLOWED_ORIGIN } });
   }
 
-  // Called by pg_cron with service-role key in Authorization header
+  // Called by trusted automation with a service-role credential in Authorization.
   const authHeader = req.headers.get("Authorization") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  if (!serviceKey || !authHeader.includes(serviceKey)) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+
+  let authorizedServiceCredential = !!serviceKey && authHeader === `Bearer ${serviceKey}`;
+  if (!authorizedServiceCredential && supabaseUrl && anonKey && authHeader.startsWith("Bearer ")) {
+    // Validate effective DB privileges to support key rotation between Vault and
+    // function environment. guardian_operators is not readable by anon/authenticated.
+    const verifier = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { error: verifyError } = await verifier
+      .from("guardian_operators")
+      .select("user_id")
+      .limit(0);
+    authorizedServiceCredential = !verifyError;
+  }
+
+  if (!authorizedServiceCredential || !supabaseUrl || !serviceKey) {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
   }
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
+  const supabase = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 
   const results: Array<Record<string, unknown>> = [];
+  let claimFailure: string | null = null;
   const MAX_TASKS_PER_RUN = 3;
 
   for (let i = 0; i < MAX_TASKS_PER_RUN; i++) {
     // Claim next pending task atomically (SKIP LOCKED)
     const { data: task, error: claimErr } = await supabase.rpc("claim_next_agent_task");
-    if (claimErr || !task?.id) break;
+    if (claimErr) {
+      claimFailure = claimErr.message;
+      console.error("[agent-scheduler] claim_next_agent_task failed:", claimErr.message);
+      break;
+    }
+    if (!task?.id) break;
 
     const taskId    = task.id        as string;
     const userId    = task.user_id   as string;
     const agentName = task.agent_name as string;
     const input     = (task.input ?? {}) as Record<string, unknown>;
+    const startedAt = new Date().toISOString();
     const startMs   = Date.now();
 
     console.log(`[agent-scheduler] Running ${agentName} for user ${userId.slice(0, 8)}…`);
 
     try {
       // Check plan allows agents
-      const { data: limits } = await supabase.rpc("get_user_plan_limits", { p_user_id: userId });
+      const { data: limits, error: limitsErr } = await supabase.rpc("get_user_plan_limits", { p_user_id: userId });
+      if (limitsErr) throw new Error(`get_user_plan_limits failed: ${limitsErr.message}`);
       if (!limits?.agents_enabled) {
-        await supabase.rpc("complete_agent_task", {
+        await completeAgentTask(supabase, {
           p_task_id: taskId, p_status: "failed",
           p_error:   "Agents not available on current plan. Upgrade to Pro.",
         });
@@ -230,10 +264,11 @@ serve(async (req: Request) => {
       // Get agent prompt function
       const promptFn = AGENT_PROMPTS[agentName];
       if (!promptFn) {
-        await supabase.rpc("complete_agent_task", {
+        await completeAgentTask(supabase, {
           p_task_id: taskId, p_status: "failed",
           p_error:   `Unknown agent: ${agentName}`,
         });
+        results.push({ taskId, status: "failed", agentName, error: `Unknown agent: ${agentName}` });
         continue;
       }
 
@@ -258,16 +293,17 @@ serve(async (req: Request) => {
         }
       }
 
-      // Write results back to AABOS tables
+      // Persist business output; any failure prevents a successful task state.
       await persistResults(supabase, userId, agentName, parsed);
 
-      // Mark task complete
-      await supabase.rpc("complete_agent_task", {
+      // Mark task complete and surface RPC failures.
+      await completeAgentTask(supabase, {
         p_task_id: taskId, p_status: "success", p_output: parsed,
       });
 
-      // Log the run with full token data
-      await supabase.from("agent_runs").insert({
+      // Run logging is observability: report a logging failure without retrying
+      // a task whose business output and task completion already succeeded.
+      const { error: runLogError } = await supabase.from("agent_runs").insert({
         user_id:       userId,
         agent_name:    agentName,
         status:        "success",
@@ -277,20 +313,31 @@ serve(async (req: Request) => {
         input_tokens:  inputTokens,
         output_tokens: outputTokens,
         duration_ms:   Date.now() - startMs,
+        created_at:    startedAt,
         completed_at:  new Date().toISOString(),
       });
-
-      results.push({ taskId, status: "success", agentName, inputTokens, outputTokens });
+      if (runLogError) {
+        console.error("[agent-scheduler] agent_runs success log failed:", runLogError.message);
+        results.push({ taskId, status: "success", agentName, inputTokens, outputTokens, warning: "agent_runs logging failed" });
+      } else {
+        results.push({ taskId, status: "success", agentName, inputTokens, outputTokens });
+      }
 
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error(`[agent-scheduler] ${agentName} failed:`, errMsg);
 
-      await supabase.rpc("complete_agent_task", {
-        p_task_id: taskId, p_status: "failed", p_error: errMsg,
-      });
+      let completionFailure: string | null = null;
+      try {
+        await completeAgentTask(supabase, {
+          p_task_id: taskId, p_status: "failed", p_error: errMsg,
+        });
+      } catch (completionErr) {
+        completionFailure = completionErr instanceof Error ? completionErr.message : String(completionErr);
+        console.error("[agent-scheduler] failed to mark task failed:", completionFailure);
+      }
 
-      await supabase.from("agent_runs").insert({
+      const { error: failedRunLogError } = await supabase.from("agent_runs").insert({
         user_id:      userId,
         agent_name:   agentName,
         status:       "failed",
@@ -298,15 +345,17 @@ serve(async (req: Request) => {
         result:       "",
         error:        errMsg,
         duration_ms:  Date.now() - startMs,
+        created_at:   startedAt,
         completed_at: new Date().toISOString(),
       });
+      if (failedRunLogError) console.error("[agent-scheduler] failed to insert failure run log:", failedRunLogError.message);
 
-      results.push({ taskId, status: "failed", agentName, error: errMsg });
+      results.push({ taskId, status: "failed", agentName, error: errMsg, ...(completionFailure ? { completionError: completionFailure } : {}) });
     }
   }
 
   return new Response(
-    JSON.stringify({ processed: results.length, results }),
-    { status: 200, headers: { "Content-Type": "application/json" } }
+    JSON.stringify({ processed: results.length, results, ...(claimFailure ? { error: "Task claim failed" } : {}) }),
+    { status: claimFailure ? 500 : 200, headers: { "Content-Type": "application/json" } }
   );
 });
